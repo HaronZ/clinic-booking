@@ -1,13 +1,29 @@
 # Clinic Appointment Booking System
 
-> Vanilla PHP 8.5 · MySQL 8 · Angular 17 · MIT License
+> Vanilla PHP 8.2 · MySQL 8 · Angular 17 · Deployed on Railway · MIT License
 
 A production-ready clinic appointment booking system with a patient booking wizard, staff dashboard, JWT authentication, and email notifications.
 
-[![PHP 8.5](https://img.shields.io/badge/PHP-8.5-blue)](https://www.php.net/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-railway.app-blueviolet)](https://clinic-booking-production.up.railway.app)
+[![PHP 8.2](https://img.shields.io/badge/PHP-8.2-blue)](https://www.php.net/)
 [![Angular 17](https://img.shields.io/badge/Angular-17-red)](https://angular.io/)
 [![Tests](https://img.shields.io/badge/tests-21%20passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+---
+
+## 🚀 Live Demo
+
+**[https://clinic-booking-production.up.railway.app](https://clinic-booking-production.up.railway.app)**
+
+| Role | Username | Password |
+|------|----------|----------|
+| Patient | *(no login needed)* | — just open the link |
+| Doctor | `ana.reyes` | `doctor123` |
+| Receptionist | `reception` | `reception123` |
+| Admin | `admin` | `admin123` |
+
+> Staff login is at the bottom of the booking page.
 
 ---
 
