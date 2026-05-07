@@ -28,6 +28,18 @@ A production-ready clinic appointment booking system. Patients book appointments
 
 ---
 
+## Screenshots
+
+| Patient booking wizard | Staff dashboard |
+|---|---|
+| ![Booking wizard — slot picker](docs/screenshots/booking-wizard.png) | ![Staff dashboard with confirm/cancel actions](docs/screenshots/staff-dashboard.png) |
+
+| Admin panel — schedule editor | Forced first-login password change |
+|---|---|
+| ![Admin schedules — 7-day grid](docs/screenshots/admin-schedules.png) | ![Set Your Password screen](docs/screenshots/change-password.png) |
+
+---
+
 ## Architecture at a glance
 
 ```mermaid
