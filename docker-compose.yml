@@ -1,0 +1,58 @@
+# Zero-setup local stack:  docker compose up
+#
+# Boots MySQL 8 + the existing production Dockerfile (which bundles the
+# Angular build into PHP's public folder and serves both from one process).
+# Demo data is loaded automatically by `migrate.php --demo` at container start.
+#
+# When the `app` container is healthy, open http://localhost:8080 and
+# log in as admin / admin123 — the forced first-login screen takes over
+# from there.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: clinic-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: clinicroot
+      MYSQL_DATABASE: clinic_booking
+      MYSQL_USER: clinic
+      MYSQL_PASSWORD: clinic
+    # Expose MySQL on a non-default host port so it doesn't collide with a
+    # MySQL the developer may already have running locally on 3306.
+    ports:
+      - "33060:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pclinicroot"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  app:
+    build: .
+    container_name: clinic-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: clinic_booking
+      DB_USER: clinic
+      DB_PASS: clinic
+      # 64-char hex string. Long enough to clear the migrate.php JWT_SECRET
+      # safety check; replace with your own secret if you'd rather not share
+      # this one across every fresh clone.
+      JWT_SECRET: dev-only-do-not-reuse-d4f9c1b8a7e3f602c5d8a1b4f7c0e3d6a9b2c5e8
+      JWT_TTL_HOURS: "12"
+      MAIL_ENABLED: "0"
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql_data:

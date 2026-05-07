@@ -124,7 +124,23 @@ CLAUDE.md             Architecture rules — read before modifying
 
 ---
 
-## Prerequisites
+## Quick start — Docker (recommended)
+
+Only requirement: [Docker](https://www.docker.com/products/docker-desktop/) ≥ 20.10.
+
+```bash
+git clone https://github.com/HaronZ/clinic-booking.git
+cd clinic-booking
+docker compose up
+```
+
+First boot pulls images and runs migrations (~3 min). Subsequent starts are seconds. When you see `PHP Development Server (http://0.0.0.0:8080) started`, open **http://localhost:8080** and log in as `admin` / `admin123`.
+
+To wipe the DB and start over: `docker compose down -v && docker compose up`.
+
+---
+
+## Prerequisites — without Docker
 
 - **PHP 8.2+** with extensions: `pdo_mysql`, `mbstring`, `openssl`
 - **Composer 2**
@@ -133,7 +149,7 @@ CLAUDE.md             Architecture rules — read before modifying
 
 ---
 
-## Quick start (4 steps)
+## Manual quick start (4 steps)
 
 ### 1 — Clone and install
 
