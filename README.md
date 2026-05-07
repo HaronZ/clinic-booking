@@ -80,60 +80,61 @@ CLAUDE.md             Architecture rules — read before modifying
 
 ## Prerequisites
 
-- **PHP 8.1+** with extensions: `pdo_mysql`, `mbstring`, `openssl`, `zip`
+- **PHP 8.2+** with extensions: `pdo_mysql`, `mbstring`, `openssl`
 - **Composer 2**
 - **MySQL 8.0+**
-- **Node 18+ / npm**
+- **Node 20+ / npm**
 
 ---
 
-## One-time setup
+## Quick start (3 steps)
 
-### 1 — Databases
+### 1 — Clone and install
 
-```sql
-CREATE DATABASE clinic_booking      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE clinic_booking_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-GRANT ALL ON clinic_booking.*      TO 'youruser'@'localhost';
-GRANT ALL ON clinic_booking_test.* TO 'youruser'@'localhost';
+```bash
+git clone https://github.com/HaronZ/clinic-booking.git
+cd clinic-booking
+
+# Install PHP dependencies
+cd backend && composer install && cd ..
+
+# Install Angular dependencies
+cd frontend && npm install && cd ..
 ```
 
-### 2 — Migrations + seed data
+### 2 — Configure environment
 
 ```bash
 cd backend
-
-# Production DB
-mysql -u youruser -p clinic_booking < db/migrations/001_create_providers.sql
-mysql -u youruser -p clinic_booking < db/migrations/002_create_appointment_types.sql
-mysql -u youruser -p clinic_booking < db/migrations/003_create_provider_schedules.sql
-mysql -u youruser -p clinic_booking < db/migrations/004_create_appointments.sql
-mysql -u youruser -p clinic_booking < db/migrations/005_create_staff_users.sql
-mysql -u youruser -p clinic_booking < db/seed.sql
-mysql -u youruser -p clinic_booking < db/seed_staff.sql
-
-# Test DB
-mysql -u youruser -p clinic_booking_test < db/migrations/001_create_providers.sql
-mysql -u youruser -p clinic_booking_test < db/migrations/002_create_appointment_types.sql
-mysql -u youruser -p clinic_booking_test < db/migrations/003_create_provider_schedules.sql
-mysql -u youruser -p clinic_booking_test < db/migrations/004_create_appointments.sql
-mysql -u youruser -p clinic_booking_test < db/migrations/005_create_staff_users.sql
+cp .env.example .env
 ```
 
-### 3 — Backend
+Edit `.env` with your local MySQL credentials:
+
+```ini
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=clinic_booking
+DB_USER=root          # your MySQL username
+DB_PASS=              # your MySQL password
+JWT_SECRET=any-random-string-here
+```
+
+### 3 — Create database + run migrations (one command)
 
 ```bash
-cd backend
-cp .env.example .env     # edit DB_USER, DB_PASS, JWT_SECRET
-composer install
+# Create the database first
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS clinic_booking CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# Run the all-in-one migration script (creates tables + seeds demo data)
+php backend/scripts/migrate.php
 ```
 
-### 4 — Frontend
-
-```bash
-cd frontend
-npm install
-```
+That's it! The migration script automatically seeds:
+- ✅ **2 doctors** — Dr. Ana Reyes (General Medicine), Dr. Luis Mendoza (Internal Medicine)
+- ✅ **3 appointment types** — General Consultation (30 min), Follow-up Visit (15 min), Annual Physical (60 min)
+- ✅ **Doctor schedules** — Ana: Mon–Thu 9–5, Fri 9–12 · Luis: Mon/Wed/Fri 1–6pm, Sat 9–12
+- ✅ **4 staff accounts** — see the table below
 
 ---
 
