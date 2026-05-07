@@ -177,12 +177,13 @@ $router->register('GET', '/api/providers', function () use ($providerRepo): void
 });
 
 $router->register('GET', '/api/appointment-types', function () use ($pdo): void {
-    $stmt = $pdo->query(
+    $stmt = $pdo->prepare(
         'SELECT id, name, slug, duration_minutes
            FROM appointment_types
           WHERE is_active = 1
           ORDER BY duration_minutes'
     );
+    $stmt->execute();
     Response::success($stmt->fetchAll());
 });
 

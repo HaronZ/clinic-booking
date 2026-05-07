@@ -58,7 +58,8 @@ final class StaffRepository
             $sql .= ' WHERE is_active = 1';
         }
         $sql .= ' ORDER BY role, name';
-        $stmt = $this->pdo->query($sql);
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 

@@ -28,6 +28,45 @@ A production-ready clinic appointment booking system. Patients book appointments
 
 ---
 
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    Patient[Patient<br/>booking wizard]
+    Staff[Staff<br/>login + dashboard]
+    Admin[Admin<br/>panel — 4 tabs]
+  end
+
+  subgraph "Angular 17 SPA"
+    SPA[Standalone components<br/>signals · OnPush · strict TS]
+  end
+
+  subgraph "PHP 8.2 backend (vanilla)"
+    Router[Front controller<br/>public/index.php]
+    Auth[AuthService<br/>JWT · requireRole]
+    Booking[BookingService<br/>SELECT … FOR UPDATE]
+    Admin2[Admin services<br/>Provider · Type · Schedule · Staff]
+    Repo[Repositories<br/>PDO · prepared statements only]
+  end
+
+  subgraph "MySQL 8"
+    DB[(providers · appointment_types<br/>provider_schedules · appointments<br/>staff_users)]
+  end
+
+  Patient & Staff & Admin --> SPA
+  SPA -->|"/api/* (JSON)"| Router
+  Router --> Auth
+  Router --> Booking
+  Router --> Admin2
+  Auth & Booking & Admin2 --> Repo
+  Repo --> DB
+```
+
+The double-booking guard lives in `BookingService::create()` — a `SELECT … FOR UPDATE` inside an explicit transaction locks the candidate slot so concurrent writes can't both succeed. Status transitions (`pending → confirmed → completed`, etc.) are enforced by an explicit allow-list in `BookingService::transition()`. PII is never logged; `end_time` is always derived server-side from `appointment_types.duration_minutes`.
+
+---
+
 ## Features
 
 | Feature | Status |
@@ -205,6 +244,45 @@ MAIL_PASS=your-16-char-app-password
 MAIL_FROM=noreply@yourclinic.com
 MAIL_FROM_NAME="Your Clinic"
 ```
+
+---
+
+## Troubleshooting
+
+**`ERROR: Could not connect — SQLSTATE[HY000] [2002]`**
+MySQL isn't running, or the credentials in `backend/.env` don't match. Verify:
+- `mysql --version` returns a number (i.e. MySQL is installed)
+- The MySQL service is running (`Get-Service MySQL*` on Windows, `brew services list` on Mac, `systemctl status mysql` on Linux)
+- `DB_USER` and `DB_PASS` in `backend/.env` actually log in: `mysql -u <DB_USER> -p`
+
+**`ERROR: JWT_SECRET is missing, still set to a placeholder, or shorter than 32 chars.`**
+You copied `.env.example` to `.env` but didn't replace the `JWT_SECRET` line. Generate a real one:
+```powershell
+php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
+```
+Paste the output as the value of `JWT_SECRET=` in `backend/.env`, then re-run migrate.
+
+**Booking page loads but `/api/*` requests return 404 / CORS errors**
+The Angular dev server (`localhost:4200`) proxies `/api/*` to the PHP server (`localhost:8080`). If PHP isn't running on 8080, every request 404s. Open a second terminal and run:
+```powershell
+php -S localhost:8080 -t backend/public
+```
+
+**Admin panel is empty after first login**
+You ran `php backend/scripts/migrate.php` without `--demo`, so the database has no providers, types, schedules, or non-admin staff yet. Either:
+- Re-run with `--demo` (wipes data → fresh demo clinic), or
+- Stay logged in as `admin` and configure providers / types / schedules / staff via the four admin tabs (the panel is designed for exactly this).
+
+**`Column not found: 'must_change_password'` after deploying to Railway**
+Migration 006 didn't apply. Trigger a redeploy after pulling the latest `master` (the migration runner now strips leading `--` comments correctly). Or run the migration manually:
+```sql
+ALTER TABLE staff_users
+  ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0
+  AFTER is_active;
+```
+
+**Tests fail with `Refusing to run tests against database '…'`**
+`tests/bootstrap.php` requires the test DB name to contain the literal string `test`. Check `TEST_DB_NAME` in `backend/.env` — default is `clinic_booking_test`.
 
 ---
 

@@ -29,6 +29,23 @@ if (is_file($envFile)) {
     }
 }
 
+// ── Refuse to start if JWT_SECRET is missing, default, or too weak ───────────
+// Catches the failure mode where someone clones the repo, copies .env.example
+// to .env, runs migrate.php, and ships to production without ever touching
+// the placeholder secret — issuing JWTs that anyone with the repo can forge.
+$jwtSecret    = (string) ($_ENV['JWT_SECRET'] ?? getenv('JWT_SECRET') ?: '');
+$jwtDefaults  = [
+    'change-me-in-production-please',
+    'change-me-to-a-long-random-string-in-production',
+];
+if ($jwtSecret === '' || in_array($jwtSecret, $jwtDefaults, true) || strlen($jwtSecret) < 32) {
+    fwrite(STDERR, "ERROR: JWT_SECRET is missing, still set to a placeholder, or shorter than 32 chars.\n");
+    fwrite(STDERR, "Generate a strong one and set it in your .env (or as a Railway env var):\n\n");
+    fwrite(STDERR, "  php -r \"echo bin2hex(random_bytes(32)), PHP_EOL;\"\n\n");
+    fwrite(STDERR, "Then put the output in JWT_SECRET= and re-run this command.\n");
+    exit(1);
+}
+
 // ── Read DB credentials (supports .env names and Railway MYSQL* names) ────────
 function dbenv(array $keys, string $default = ''): string {
     foreach ($keys as $k) {

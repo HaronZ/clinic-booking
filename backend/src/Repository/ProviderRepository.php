@@ -43,7 +43,8 @@ final class ProviderRepository
         }
         $sql .= ' ORDER BY name';
 
-        $stmt = $this->pdo->query($sql);
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 
