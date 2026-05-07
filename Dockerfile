@@ -34,5 +34,7 @@ COPY --from=frontend /build/dist/frontend/browser/ ./backend/public/
 # Railway sets $PORT dynamically at runtime (default 8080 for local Docker)
 EXPOSE 8080
 
-# php -S with router.php handles both API and Angular SPA in one process
-CMD php -S 0.0.0.0:${PORT:-8080} -t /app/backend/public /app/backend/public/router.php
+# Run migrations (idempotent: errors 1050/1060/1061 are silently ignored),
+# then start the PHP dev server with the SPA router.
+CMD php /app/backend/scripts/migrate.php --demo \
+ && php -S 0.0.0.0:${PORT:-8080} -t /app/backend/public /app/backend/public/router.php
