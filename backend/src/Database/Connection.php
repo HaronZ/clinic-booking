@@ -23,12 +23,29 @@ final class Connection
             return self::$pdo;
         }
 
-        // Support both local .env names (DB_*) and Railway MySQL plugin names (MYSQL*)
-        $host = self::first(['DB_HOST', 'MYSQLHOST',     'MYSQL_HOST'],     '127.0.0.1');
-        $port = self::first(['DB_PORT', 'MYSQLPORT',     'MYSQL_PORT'],     '3306');
-        $name = self::first(['DB_NAME', 'MYSQLDATABASE', 'MYSQL_DATABASE'], '');
-        $user = self::first(['DB_USER', 'MYSQLUSER',     'MYSQL_USER'],     '');
-        $pass = self::first(['DB_PASS', 'MYSQLPASSWORD', 'MYSQL_PASSWORD'], '', required: false);
+        // 1. Railway provides MYSQL_URL (or DATABASE_URL) as a full DSN string.
+        //    Prefer this so we always use the correct internal credentials.
+        $url = self::first(
+            ['MYSQL_URL', 'DATABASE_URL', 'MYSQL_PRIVATE_URL'],
+            '',
+            required: false,
+        );
+
+        if ($url !== '') {
+            $parts = parse_url($url);
+            $host  = $parts['host'] ?? '127.0.0.1';
+            $port  = (string) ($parts['port'] ?? 3306);
+            $name  = ltrim($parts['path'] ?? '', '/');
+            $user  = urldecode($parts['user'] ?? '');
+            $pass  = urldecode($parts['pass'] ?? '');
+        } else {
+            // 2. Fall back to individual env vars (local .env or explicitly-set Railway vars)
+            $host = self::first(['DB_HOST', 'MYSQLHOST',     'MYSQL_HOST'],     '127.0.0.1');
+            $port = self::first(['DB_PORT', 'MYSQLPORT',     'MYSQL_PORT'],     '3306');
+            $name = self::first(['DB_NAME', 'MYSQLDATABASE', 'MYSQL_DATABASE'], '');
+            $user = self::first(['DB_USER', 'MYSQLUSER',     'MYSQL_USER'],     '');
+            $pass = self::first(['DB_PASS', 'MYSQLPASSWORD', 'MYSQL_PASSWORD'], '', required: false);
+        }
 
         $dsn = sprintf(
             'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
