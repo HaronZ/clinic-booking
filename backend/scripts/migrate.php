@@ -2,18 +2,20 @@
 declare(strict_types=1);
 
 /**
- * One-shot migration + seed runner.
+ * Database migration runner.
  *
- * Usage (Railway shell or local):
- *   php backend/scripts/migrate.php
+ * Usage:
+ *   php backend/scripts/migrate.php           # tables only  (for real clinics)
+ *   php backend/scripts/migrate.php --demo    # tables + demo data (for dev/portfolio)
  *
- * Reads DB credentials from env vars (same names as .env or Railway MySQL plugin).
- * Safe to run multiple times — all statements use IF NOT EXISTS / INSERT IGNORE.
+ * Reads DB credentials from .env (local) or environment variables (Railway).
+ * Safe to re-run — all statements use IF NOT EXISTS / INSERT IGNORE.
  */
 
-$root = dirname(__DIR__); // backend/
+$withDemo = in_array('--demo', $argv ?? [], true);
+$root     = dirname(__DIR__); // backend/
 
-// Load .env if it exists (local dev)
+// ── Load .env if it exists (local dev) ───────────────────────────────────────
 $envFile = $root . '/.env';
 if (is_file($envFile)) {
     foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -27,7 +29,7 @@ if (is_file($envFile)) {
     }
 }
 
-// Read DB credentials — supports local (.env) and Railway (MYSQL*) names
+// ── Read DB credentials (supports .env names and Railway MYSQL* names) ────────
 function dbenv(array $keys, string $default = ''): string {
     foreach ($keys as $k) {
         $v = $_ENV[$k] ?? getenv($k);
@@ -44,7 +46,7 @@ $pass = dbenv(['DB_PASS', 'MYSQLPASSWORD', 'MYSQL_PASSWORD']);
 
 if ($name === '' || $user === '') {
     fwrite(STDERR, "ERROR: Database credentials not found in environment.\n");
-    fwrite(STDERR, "Set DB_HOST, DB_NAME, DB_USER, DB_PASS (or Railway MYSQL* vars).\n");
+    fwrite(STDERR, "Set DB_HOST, DB_NAME, DB_USER, DB_PASS in .env (or Railway MYSQL* vars).\n");
     exit(1);
 }
 
@@ -55,43 +57,59 @@ try {
         "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4",
         $user,
         $pass,
-        [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
     );
 } catch (PDOException $e) {
-    fwrite(STDERR, "ERROR: Could not connect to database: " . $e->getMessage() . "\n");
+    fwrite(STDERR, "ERROR: Could not connect — " . $e->getMessage() . "\n");
     exit(1);
 }
 
-$schemaFile = $root . '/db/schema.sql';
-if (!is_file($schemaFile)) {
-    fwrite(STDERR, "ERROR: Schema file not found: {$schemaFile}\n");
-    exit(1);
-}
-
-echo "Running schema.sql ...\n";
-
-// Split on semicolons, skip blank statements
-$sql        = file_get_contents($schemaFile);
-$statements = array_filter(
-    array_map('trim', explode(';', $sql)),
-    fn(string $s) => $s !== '' && !preg_match('/^--/', $s),
-);
-
-$count = 0;
-foreach ($statements as $stmt) {
-    try {
-        $pdo->exec($stmt);
-        $count++;
-    } catch (PDOException $e) {
-        // 1061 = duplicate key name (index already exists) — safe to ignore
-        if (str_contains($e->getMessage(), '1061')) continue;
-        fwrite(STDERR, "WARNING: " . $e->getMessage() . "\n");
-        fwrite(STDERR, "Statement: " . substr($stmt, 0, 120) . "\n\n");
+// ── Helper: run a SQL file ────────────────────────────────────────────────────
+function runSqlFile(PDO $pdo, string $file, string $label): void
+{
+    if (!is_file($file)) {
+        fwrite(STDERR, "ERROR: File not found: {$file}\n");
+        exit(1);
     }
+
+    echo "Running {$label} ...\n";
+
+    $statements = array_filter(
+        array_map('trim', explode(';', (string) file_get_contents($file))),
+        fn(string $s) => $s !== '' && !preg_match('/^--/', $s),
+    );
+
+    $count = 0;
+    foreach ($statements as $stmt) {
+        try {
+            $pdo->exec($stmt);
+            $count++;
+        } catch (PDOException $e) {
+            // 1061 = duplicate key name (index already exists) — safe to ignore
+            if (str_contains($e->getMessage(), '1061')) continue;
+            fwrite(STDERR, "WARNING: " . $e->getMessage() . "\n");
+            fwrite(STDERR, "Statement: " . substr($stmt, 0, 120) . "\n\n");
+        }
+    }
+
+    echo "  → {$count} statements executed.\n";
 }
 
-echo "Done — {$count} statements executed.\n";
-echo "Database is ready.\n";
+// ── Run schema (tables only — always) ────────────────────────────────────────
+runSqlFile($pdo, $root . '/db/schema.sql', 'schema.sql (table structure)');
+
+// ── Run demo seed (optional) ──────────────────────────────────────────────────
+if ($withDemo) {
+    echo "\n--demo flag detected: loading demo data ...\n";
+    runSqlFile($pdo, $root . '/db/seed_demo.sql', 'seed_demo.sql (demo data)');
+    echo "\nDemo accounts loaded:\n";
+    echo "  admin        / admin123\n";
+    echo "  reception    / reception123\n";
+    echo "  ana.reyes    / doctor123\n";
+    echo "  luis.mendoza / doctor123\n";
+} else {
+    echo "\nTables are ready. No demo data loaded.\n";
+    echo "Add your own providers, appointment types, and staff via MySQL.\n";
+}
+
+echo "\nDatabase setup complete.\n";

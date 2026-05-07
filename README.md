@@ -120,21 +120,31 @@ DB_PASS=              # your MySQL password
 JWT_SECRET=any-random-string-here
 ```
 
-### 3 — Create database + run migrations (one command)
+### 3 — Create database + run migrations
 
 ```bash
-# Create the database first
+# Create the database
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS clinic_booking CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-# Run the all-in-one migration script (creates tables + seeds demo data)
-php backend/scripts/migrate.php
 ```
 
-That's it! The migration script automatically seeds:
-- ✅ **2 doctors** — Dr. Ana Reyes (General Medicine), Dr. Luis Mendoza (Internal Medicine)
-- ✅ **3 appointment types** — General Consultation (30 min), Follow-up Visit (15 min), Annual Physical (60 min)
-- ✅ **Doctor schedules** — Ana: Mon–Thu 9–5, Fri 9–12 · Luis: Mon/Wed/Fri 1–6pm, Sat 9–12
-- ✅ **4 staff accounts** — see the table below
+Then choose **one** of the following:
+
+**Option A — Real clinic (empty, your own data)**
+```bash
+php backend/scripts/migrate.php
+```
+Creates all tables with no data. Add your own doctors, appointment types,
+and staff directly in MySQL.
+
+**Option B — Try the demo / portfolio (pre-filled sample data)**
+```bash
+php backend/scripts/migrate.php --demo
+```
+Creates tables AND loads sample data identical to the live demo:
+- 2 doctors (Dr. Ana Reyes, Dr. Luis Mendoza)
+- 3 appointment types (General Consultation, Follow-up Visit, Annual Physical)
+- Doctor schedules for the week
+- 4 staff accounts (see login table below)
 
 ---
 
