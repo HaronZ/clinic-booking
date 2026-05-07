@@ -1,0 +1,43 @@
+<section class="login-wrap">
+  <div class="login-card">
+    <h1>Staff Login</h1>
+    <p class="subtitle">Clinic management portal</p>
+
+    <form (ngSubmit)="onSubmit()" #f="ngForm">
+      <div class="field">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          type="text"
+          autocomplete="username"
+          [ngModel]="username()"
+          (ngModelChange)="username.set($event)"
+          name="username"
+          required
+          placeholder="e.g. ana.reyes"
+        />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          type="password"
+          autocomplete="current-password"
+          [ngModel]="password()"
+          (ngModelChange)="password.set($event)"
+          name="password"
+          required
+        />
+      </div>
+
+      @if (error()) {
+        <div class="alert-error">{{ error() }}</div>
+      }
+
+      <button type="submit" class="btn-primary" [disabled]="loading()">
+        @if (loading()) { Signing in… } @else { Sign in }
+      </button>
+    </form>
+  </div>
+</section>

@@ -1,0 +1,66 @@
+<section class="confirmation">
+  @if (loading()) {
+    <div class="card skeleton">
+      <div class="skel-bar skel-bar--title"></div>
+      <div class="skel-bar"></div>
+      <div class="skel-bar"></div>
+      <div class="skel-bar skel-bar--short"></div>
+    </div>
+  }
+
+  @if (error()) {
+    <div class="card error">
+      <h1>Could not load booking</h1>
+      <p>{{ error() }}</p>
+    </div>
+  }
+
+  @if (booking(); as b) {
+    <div class="card">
+      <div class="card__header">
+        <h1>Booking confirmed</h1>
+        <span class="badge"
+          [class.badge--pending]="b.status === 'pending'"
+          [class.badge--confirmed]="b.status === 'confirmed'"
+          [class.badge--completed]="b.status === 'completed'"
+          [class.badge--cancelled]="b.status === 'cancelled'">
+          {{ b.status }}
+        </span>
+      </div>
+
+      @if (b.status === 'pending' || b.status === 'confirmed') {
+        <p class="lede">Your appointment has been received. Please arrive <strong>10 minutes early</strong>.</p>
+      } @else if (b.status === 'cancelled') {
+        <p class="lede cancelled-msg">This appointment has been cancelled.</p>
+      } @else if (b.status === 'completed') {
+        <p class="lede completed-msg">This appointment has been completed. Thank you for visiting!</p>
+      }
+
+      <dl>
+        <dt>Reference</dt>
+        <dd><code>{{ b.id }}</code></dd>
+
+        <dt>Provider</dt>
+        <dd>{{ b.provider.name }} <span class="muted">— {{ b.provider.specialty }}</span></dd>
+
+        <dt>Type</dt>
+        <dd>{{ b.appointment_type.name }} <span class="muted">({{ b.appointment_type.duration_minutes }} min)</span></dd>
+
+        <dt>Date &amp; Time</dt>
+        <dd>{{ b.start_time | slice:0:10 }} · {{ b.start_time | slice:11:16 }} – {{ b.end_time | slice:11:16 }}</dd>
+      </dl>
+
+      @if (canCancel) {
+        <div class="cancel-zone">
+          @if (cancelError()) {
+            <p class="cancel-error">{{ cancelError() }}</p>
+          }
+          <button class="btn-cancel" [disabled]="cancelling()" (click)="cancelBooking()">
+            @if (cancelling()) { Cancelling… } @else { Cancel appointment }
+          </button>
+          <p class="cancel-hint">Need to reschedule? Cancel and book a new slot.</p>
+        </div>
+      }
+    </div>
+  }
+</section>

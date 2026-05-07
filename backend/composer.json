@@ -1,0 +1,37 @@
+{
+    "name": "haron/clinic-booking",
+    "description": "Clinic appointment booking system MVP — vanilla PHP 8.2 + PDO + MySQL 8",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "ext-json": "*",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "firebase/php-jwt": "^7.0",
+        "phpmailer/phpmailer": "^7.0",
+        "ramsey/uuid": "^4.7",
+        "vlucas/phpdotenv": "^5.6"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Clinic\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Clinic\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --testdox",
+        "serve": "php -S localhost:8080 -t public"
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    }
+}

@@ -1,0 +1,22 @@
+# Dependencies (rebuilt inside Docker)
+frontend/node_modules/
+backend/vendor/
+
+# Angular build output (built inside Docker from source)
+frontend/dist/
+
+# Local dev files — never go into the image
+backend/.env
+backend/db/seed_staff.sql
+*.log
+
+# Git & editor
+.git/
+.gitignore
+*.md
+.vscode/
+.idea/
+
+# Test artifacts
+backend/tests/
+backend/phpunit.xml

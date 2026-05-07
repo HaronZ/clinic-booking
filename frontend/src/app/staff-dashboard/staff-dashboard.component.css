@@ -1,0 +1,209 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f3f4f6;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1f2937;
+}
+
+/* ---- Top bar ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  background: #2563eb;
+  color: #fff;
+  padding: 0.85rem 1.5rem;
+}
+
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.topbar__logo { font-size: 1.4rem; }
+
+.topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.btn-logout {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff;
+  padding: 0.3rem 0.75rem;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn-logout:hover { background: rgba(255,255,255,0.3); }
+
+/* ---- Controls ---- */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+
+.controls label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.controls input[type="date"] {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.btn-refresh {
+  padding: 0.4rem 0.85rem;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-refresh:hover:not(:disabled) { background: #e5e7eb; }
+.btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- State messages ---- */
+.state-msg {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
+
+.state-msg.empty { font-size: 1.1rem; }
+
+.alert-error {
+  margin: 1rem 1.5rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}
+
+/* ---- Schedule table ---- */
+.table-wrap {
+  padding: 1rem 1.5rem;
+  overflow-x: auto;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.9rem;
+}
+
+.schedule-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.schedule-table td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: top;
+}
+
+.schedule-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.schedule-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.row--cancelled { opacity: 0.55; }
+.row--completed { background: #f0fdf4 !important; }
+
+.time-cell { white-space: nowrap; font-weight: 600; }
+.time-end  { font-weight: 400; color: #6b7280; font-size: 0.85rem; }
+.muted     { color: #6b7280; font-size: 0.85rem; }
+.notes     { margin: 0.25rem 0 0; font-size: 0.85rem; color: #374151; font-style: italic; }
+
+/* ---- Badges ---- */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.badge--role      { background: rgba(255,255,255,0.25); color: #fff; }
+.badge--pending   { background: #fef3c7; color: #92400e; }
+.badge--confirmed { background: #d1fae5; color: #065f46; }
+.badge--completed { background: #dbeafe; color: #1e40af; }
+.badge--cancelled { background: #fee2e2; color: #991b1b; }
+
+/* ---- Action buttons ---- */
+.actions-cell {
+  white-space: nowrap;
+}
+
+.action-btn {
+  padding: 0.3rem 0.65rem;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-right: 0.35rem;
+  transition: opacity 0.15s;
+}
+
+.btn-confirm  { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+.btn-complete { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+.btn-cancel   { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+.action-btn:hover { opacity: 0.8; }
+
+.spinner {
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+  font-size: 1.1rem;
+  color: #6b7280;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Mobile ---- */
+@media (max-width: 640px) {
+  .topbar { padding: 0.75rem 1rem; }
+  .table-wrap { padding: 0.75rem; }
+  .schedule-table th,
+  .schedule-table td { padding: 0.5rem 0.6rem; font-size: 0.82rem; }
+}

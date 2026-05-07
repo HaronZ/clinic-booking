@@ -1,0 +1,164 @@
+<section class="booking">
+  <header class="booking__header">
+    <h1>Book an Appointment</h1>
+    <ol class="stepper" aria-label="Progress">
+      <li [class.active]="currentStep() === 1" [class.done]="currentStep() > 1">Provider</li>
+      <li [class.active]="currentStep() === 2" [class.done]="currentStep() > 2">Type & Date</li>
+      <li [class.active]="currentStep() === 3" [class.done]="currentStep() > 3">Slot</li>
+      <li [class.active]="currentStep() === 4" [class.done]="currentStep() > 4">Your Info</li>
+      <li [class.active]="currentStep() === 5">Confirm</li>
+    </ol>
+  </header>
+
+  <!-- Step 1: provider -->
+  @if (currentStep() === 1) {
+    <form [formGroup]="providerForm" class="step">
+      <h2>Choose a provider</h2>
+      <label for="provider">Provider</label>
+      <select id="provider" formControlName="provider_id">
+        <option value="">— Select —</option>
+        @for (p of providers(); track p.id) {
+          <option [value]="p.id">{{ p.name }} — {{ p.specialty }}</option>
+        }
+      </select>
+      <div class="actions">
+        <button type="button" (click)="goNext()" [disabled]="providerForm.invalid">Next</button>
+      </div>
+    </form>
+  }
+
+  <!-- Step 2: type + date -->
+  @if (currentStep() === 2) {
+    <form [formGroup]="typeDateForm" class="step">
+      <h2>Appointment type and date</h2>
+
+      <label for="type">Appointment type</label>
+      <select id="type" formControlName="appointment_type_id">
+        <option value="">— Select —</option>
+        @for (t of appointmentTypes(); track t.id) {
+          <option [value]="t.id">{{ t.name }} ({{ t.duration_minutes }} min)</option>
+        }
+      </select>
+
+      <label for="date">Date</label>
+      <input id="date" type="date" [min]="today" formControlName="date" />
+
+      <div class="actions">
+        <button type="button" (click)="goBack()">Back</button>
+        <button type="button" (click)="goNext()" [disabled]="typeDateForm.invalid">Next</button>
+      </div>
+    </form>
+  }
+
+  <!-- Step 3: slot -->
+  @if (currentStep() === 3) {
+    <div class="step">
+      <h2>Choose a time</h2>
+
+      @if (slotsLoading()) {
+        <p>Loading available slots…</p>
+      }
+
+      @if (slotsError()) {
+        <p class="error">Could not load slots: {{ slotsError() }}</p>
+      }
+
+      @if (!slotsLoading() && !slotsError()) {
+        @if (slots().length === 0) {
+          <p>No working hours configured for this date.</p>
+        } @else {
+          <div class="slots">
+            @for (slot of slots(); track slot.start_time) {
+              <button
+                type="button"
+                class="slot"
+                [class.unavailable]="!slot.available"
+                [class.selected]="slotForm.value.start_time === slot.start_time"
+                [disabled]="!slot.available"
+                (click)="selectSlot(slot)"
+              >
+                {{ slot.start_time }}
+              </button>
+            }
+          </div>
+
+          @if (!slotForm.value.start_time && slots().length > 0) {
+            <p class="hint">Select an available time to continue.</p>
+          }
+        }
+      }
+
+      <div class="actions">
+        <button type="button" (click)="goBack()">Back</button>
+        <button type="button" (click)="goNext()" [disabled]="slotForm.invalid">Next</button>
+      </div>
+    </div>
+  }
+
+  <!-- Step 4: patient info -->
+  @if (currentStep() === 4) {
+    <form [formGroup]="patientForm" class="step">
+      <h2>Your information</h2>
+
+      <label for="name">Full name *</label>
+      <input id="name" type="text" formControlName="patient_name" />
+
+      <label for="phone">Phone *</label>
+      <input id="phone" type="tel" formControlName="patient_phone" placeholder="+63-917-555-0100" />
+
+      <label for="email">Email (optional)</label>
+      <input id="email" type="email" formControlName="patient_email" />
+
+      <label for="notes">Notes (optional)</label>
+      <textarea id="notes" rows="3" formControlName="patient_notes"></textarea>
+
+      <div class="actions">
+        <button type="button" (click)="goBack()">Back</button>
+        <button type="button" (click)="goNext()" [disabled]="patientForm.invalid">Review</button>
+      </div>
+    </form>
+  }
+
+  <!-- Step 5: review + confirm -->
+  @if (currentStep() === 5) {
+    <div class="step review">
+      <h2>Review and confirm</h2>
+
+      <dl>
+        <dt>Provider</dt>
+        <dd>{{ selectedProviderName() }}</dd>
+
+        <dt>Type</dt>
+        <dd>{{ selectedTypeName() }} ({{ selectedTypeDuration() }} min)</dd>
+
+        <dt>Date</dt>
+        <dd>{{ typeDateForm.value.date }}</dd>
+
+        <dt>Time</dt>
+        <dd>{{ slotForm.value.start_time }}</dd>
+
+        <dt>Name</dt>
+        <dd>{{ patientForm.value.patient_name }}</dd>
+
+        <dt>Phone</dt>
+        <dd>{{ patientForm.value.patient_phone }}</dd>
+
+        @if (patientForm.value.patient_email) {
+          <dt>Email</dt>
+          <dd>{{ patientForm.value.patient_email }}</dd>
+        }
+      </dl>
+
+      @if (submitError()) {
+        <p class="error">{{ submitError() }}</p>
+      }
+
+      <div class="actions">
+        <button type="button" (click)="goBack()" [disabled]="submitting()">Back</button>
+        <button type="button" class="primary" (click)="confirm()" [disabled]="submitting()">
+          {{ submitting() ? 'Booking…' : 'Confirm booking' }}
+        </button>
+      </div>
+    </div>
+  }
+</section>

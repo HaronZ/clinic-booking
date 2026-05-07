@@ -1,0 +1,105 @@
+<div class="dashboard">
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__logo">🏥</span>
+      <span class="topbar__title">Clinic Staff Dashboard</span>
+    </div>
+    @if (staff(); as s) {
+      <div class="topbar__user">
+        <span class="topbar__name">{{ s.name }}</span>
+        <span class="badge badge--role">{{ s.role }}</span>
+        <button class="btn-logout" (click)="logout()">Sign out</button>
+      </div>
+    }
+  </header>
+
+  <!-- Date picker -->
+  <div class="controls">
+    <label for="scheduleDate">Schedule for</label>
+    <input
+      id="scheduleDate"
+      type="date"
+      [value]="date()"
+      (change)="onDateChange($any($event.target).value)"
+    />
+    <button class="btn-refresh" (click)="loadSchedule()" [disabled]="loading()">
+      Refresh
+    </button>
+  </div>
+
+  <!-- Body -->
+  @if (loading()) {
+    <div class="state-msg">Loading schedule…</div>
+  }
+
+  @if (error()) {
+    <div class="alert-error">{{ error() }}</div>
+  }
+
+  @if (!loading() && !error() && schedule(); as s) {
+    @if (s.appointments.length === 0) {
+      <div class="state-msg empty">No appointments scheduled for {{ s.date }}.</div>
+    } @else {
+      <div class="table-wrap">
+        <table class="schedule-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              @if (s.role !== 'doctor') { <th>Provider</th> }
+              <th>Patient</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (appt of s.appointments; track appt.id) {
+              <tr [class.row--cancelled]="appt.status === 'cancelled'"
+                  [class.row--completed]="appt.status === 'completed'">
+                <td class="time-cell">
+                  {{ appt.start_time | slice:11:16 }}<br>
+                  <span class="time-end">{{ appt.end_time | slice:11:16 }}</span>
+                </td>
+                @if (s.role !== 'doctor') {
+                  <td>{{ appt.provider_name }}</td>
+                }
+                <td>
+                  <strong>{{ appt.patient_name }}</strong><br>
+                  <span class="muted">{{ appt.patient_phone }}</span>
+                  @if (appt.patient_notes) {
+                    <p class="notes">{{ appt.patient_notes }}</p>
+                  }
+                </td>
+                <td>{{ appt.type_name }}<br>
+                  <span class="muted">{{ appt.type_duration_minutes }} min</span>
+                </td>
+                <td>
+                  <span class="badge"
+                    [class.badge--pending]="appt.status === 'pending'"
+                    [class.badge--confirmed]="appt.status === 'confirmed'"
+                    [class.badge--completed]="appt.status === 'completed'"
+                    [class.badge--cancelled]="appt.status === 'cancelled'">
+                    {{ appt.status }}
+                  </span>
+                </td>
+                <td class="actions-cell">
+                  @if (actioning() === appt.id) {
+                    <span class="spinner">⟳</span>
+                  } @else {
+                    @for (action of nextActions(appt.status); track action.next) {
+                      <button
+                        [class]="'action-btn ' + action.style"
+                        (click)="transition(appt, action.next)"
+                      >{{ action.label }}</button>
+                    }
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>
