@@ -3,31 +3,26 @@ import {
   inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import {
+  FormArray, FormBuilder, FormControl, FormGroup,
+  ReactiveFormsModule, Validators,
+} from '@angular/forms';
 
 import { AdminApiService, AdminProvider, ApiError } from '../../services/admin-api.service';
 
-interface DayRow {
-  day_of_week: number;
-  label: string;
-  working: boolean;
-  start_time: string;
-  end_time: string;
-}
-
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-function blankWeek(): DayRow[] {
-  return DAY_LABELS.map((label, i) => ({
-    day_of_week: i, label, working: false,
-    start_time: '09:00', end_time: '17:00',
-  }));
+interface DayRowControls {
+  working:    FormControl<boolean>;
+  start_time: FormControl<string>;
+  end_time:   FormControl<string>;
 }
+type DayRowGroup = FormGroup<DayRowControls>;
 
 @Component({
   selector: 'app-schedules-section',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display:block; padding:1.5rem; }
@@ -59,7 +54,7 @@ function blankWeek(): DayRow[] {
       <h2>Schedules</h2>
       @if (providersLoading()) { <span style="color:#9ca3af;font-size:.9rem">Loading providers…</span> }
       @if (!providersLoading() && providers().length > 0) {
-        <select [ngModel]="selectedId()" (ngModelChange)="selectProvider($event)">
+        <select [formControl]="providerCtrl">
           <option value="">— Select provider —</option>
           @for (p of providers(); track p.id) {
             <option [value]="p.id">{{ p.name }}</option>
@@ -68,86 +63,118 @@ function blankWeek(): DayRow[] {
       }
     </div>
 
-    @if (listErr()) { <div class="alert-err">{{ listErr() }}</div> }
-    @if (savedOk())  { <div class="alert-ok">Schedule saved successfully.</div> }
+    @if (listErr()) { <div class="alert-err" role="alert">{{ listErr() }}</div> }
+    @if (savedOk())  { <div class="alert-ok"  role="status">Schedule saved successfully.</div> }
 
-    @if (selectedId() && !scheduleLoading()) {
+    @if (providerCtrl.value && !scheduleLoading()) {
       <div class="schedule-card">
-        <table>
-          <thead><tr>
-            <th>Day</th><th>Working</th><th>Start</th><th>End</th>
-          </tr></thead>
-          <tbody>
-            @for (row of week(); track row.day_of_week) {
-              <tr [class.day-off]="!row.working">
-                <td><strong>{{ row.label }}</strong></td>
-                <td class="check-cell">
-                  <input type="checkbox" [(ngModel)]="row.working" />
-                </td>
-                <td>
-                  <input type="time" [(ngModel)]="row.start_time" [disabled]="!row.working" />
-                </td>
-                <td>
-                  <input type="time" [(ngModel)]="row.end_time" [disabled]="!row.working" />
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-        <div class="actions-row">
-          <button class="btn btn-blue" [disabled]="saving()" (click)="save()">
-            {{ saving() ? 'Saving…' : 'Save Schedule' }}
-          </button>
-          @if (saveErr()) { <span style="color:#991b1b;font-size:.85rem">{{ saveErr() }}</span> }
-        </div>
+        <form [formGroup]="weekForm" (ngSubmit)="save()">
+          <table>
+            <thead><tr>
+              <th>Day</th><th>Working</th><th>Start</th><th>End</th>
+            </tr></thead>
+            <tbody formArrayName="days">
+              @for (row of days.controls; track row; let i = $index) {
+                <tr [formGroupName]="i" [class.day-off]="!row.controls.working.value">
+                  <td><strong>{{ dayLabels[i] }}</strong></td>
+                  <td class="check-cell">
+                    <input type="checkbox" formControlName="working" />
+                  </td>
+                  <td>
+                    <input type="time" formControlName="start_time" [attr.disabled]="row.controls.working.value ? null : ''" />
+                  </td>
+                  <td>
+                    <input type="time" formControlName="end_time" [attr.disabled]="row.controls.working.value ? null : ''" />
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <div class="actions-row">
+            <button type="submit" class="btn btn-blue" [disabled]="saving()">
+              {{ saving() ? 'Saving…' : 'Save Schedule' }}
+            </button>
+            @if (saveErr()) { <span style="color:#991b1b;font-size:.85rem">{{ saveErr() }}</span> }
+          </div>
+        </form>
       </div>
     }
 
-    @if (!selectedId() && !providersLoading()) {
+    @if (!providerCtrl.value && !providersLoading()) {
       <div class="empty-msg">Select a provider above to view or edit their schedule.</div>
     }
-    @if (selectedId() && scheduleLoading()) {
+    @if (providerCtrl.value && scheduleLoading()) {
       <div class="empty-msg">Loading schedule…</div>
     }
   `,
 })
 export class SchedulesSectionComponent implements OnInit {
   private readonly api = inject(AdminApiService);
+  private readonly fb  = inject(FormBuilder);
 
-  readonly providers       = signal<AdminProvider[]>([]);
+  readonly providers        = signal<AdminProvider[]>([]);
   readonly providersLoading = signal(true);
-  readonly selectedId      = signal('');
-  readonly week            = signal<DayRow[]>(blankWeek());
-  readonly scheduleLoading = signal(false);
-  readonly saving          = signal(false);
-  readonly listErr         = signal<string | null>(null);
-  readonly saveErr         = signal<string | null>(null);
-  readonly savedOk         = signal(false);
+  readonly scheduleLoading  = signal(false);
+  readonly saving           = signal(false);
+  readonly listErr          = signal<string | null>(null);
+  readonly saveErr          = signal<string | null>(null);
+  readonly savedOk          = signal(false);
+
+  readonly dayLabels = DAY_LABELS;
+
+  /** Provider dropdown — held as a typed FormControl so we can react to changes via valueChanges. */
+  readonly providerCtrl = new FormControl<string>('', { nonNullable: true });
+
+  /** 7-row FormArray. Each row mirrors the API shape minus day_of_week (positional). */
+  readonly weekForm = this.fb.nonNullable.group({
+    days: this.fb.array<DayRowGroup>(this.buildBlankWeek()),
+  });
+
+  get days(): FormArray<DayRowGroup> {
+    return this.weekForm.controls.days;
+  }
 
   ngOnInit(): void {
     this.api.getProviders(false).subscribe({
       next:  (list) => { this.providers.set(list); this.providersLoading.set(false); },
       error: (e: ApiError) => { this.listErr.set(e.message); this.providersLoading.set(false); },
     });
+
+    this.providerCtrl.valueChanges.subscribe((id) => this.onProviderChange(id));
   }
 
-  selectProvider(id: string): void {
-    this.selectedId.set(id);
+  private buildBlankWeek(): DayRowGroup[] {
+    return DAY_LABELS.map((): DayRowGroup =>
+      this.fb.nonNullable.group({
+        working:    [false],
+        start_time: ['09:00', [Validators.required]],
+        end_time:   ['17:00', [Validators.required]],
+      }) as DayRowGroup,
+    );
+  }
+
+  private resetWeek(): void {
+    for (let i = 0; i < this.days.length; i++) {
+      this.days.at(i).reset({ working: false, start_time: '09:00', end_time: '17:00' });
+    }
+  }
+
+  private onProviderChange(id: string): void {
     this.savedOk.set(false);
     this.saveErr.set(null);
-    if (!id) { this.week.set(blankWeek()); return; }
+    if (!id) { this.resetWeek(); return; }
 
     this.scheduleLoading.set(true);
     this.api.getSchedule(id).subscribe({
       next: (res) => {
-        const w = blankWeek();
+        this.resetWeek();
         for (const row of res.schedule) {
-          const d = w[row.day_of_week];
-          d.working    = true;
-          d.start_time = row.start_time.slice(0, 5); // HH:MM:SS → HH:MM
-          d.end_time   = row.end_time.slice(0, 5);
+          this.days.at(row.day_of_week).reset({
+            working:    true,
+            start_time: row.start_time.slice(0, 5), // HH:MM:SS → HH:MM
+            end_time:   row.end_time.slice(0, 5),
+          });
         }
-        this.week.set(w);
         this.scheduleLoading.set(false);
       },
       error: (e: ApiError) => { this.listErr.set(e.message); this.scheduleLoading.set(false); },
@@ -155,25 +182,39 @@ export class SchedulesSectionComponent implements OnInit {
   }
 
   save(): void {
+    if (this.saving()) return;
     this.saveErr.set(null);
     this.savedOk.set(false);
 
-    const rows = this.week()
-      .filter((r) => r.working)
-      .map(({ day_of_week, start_time, end_time }) => ({ day_of_week, start_time, end_time }));
+    const working = this.days.controls
+      .map((g, i) => ({ day_of_week: i, ...g.getRawValue() }))
+      .filter((r) => r.working);
+
+    // Pre-flight: each working row must have end_time strictly > start_time.
+    // The backend enforces this too via CHECK (end_time > start_time), but
+    // failing client-side gives a much friendlier message than a 422.
+    for (const r of working) {
+      if (r.end_time <= r.start_time) {
+        this.saveErr.set(`${DAY_LABELS[r.day_of_week]}: end time must be after start time.`);
+        return;
+      }
+    }
+
+    const rows = working.map(({ day_of_week, start_time, end_time }) => ({
+      day_of_week, start_time, end_time,
+    }));
 
     this.saving.set(true);
-    this.api.saveSchedule(this.selectedId(), rows).subscribe({
+    this.api.saveSchedule(this.providerCtrl.value, rows).subscribe({
       next: (res) => {
-        // Refresh week from server response to get canonical times.
-        const w = blankWeek();
+        this.resetWeek();
         for (const row of res.schedule) {
-          const d = w[row.day_of_week];
-          d.working    = true;
-          d.start_time = row.start_time.slice(0, 5);
-          d.end_time   = row.end_time.slice(0, 5);
+          this.days.at(row.day_of_week).reset({
+            working:    true,
+            start_time: row.start_time.slice(0, 5),
+            end_time:   row.end_time.slice(0, 5),
+          });
         }
-        this.week.set(w);
         this.saving.set(false);
         this.savedOk.set(true);
       },

@@ -3,18 +3,14 @@ import {
   inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AdminApiService, AdminProvider, ApiError } from '../../services/admin-api.service';
-
-interface ProviderForm {
-  name: string; specialty: string; slug: string;
-}
 
 @Component({
   selector: 'app-providers-section',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display: block; padding: 1.5rem; }
@@ -106,25 +102,27 @@ interface ProviderForm {
       <div class="modal-back" (click)="closeModal()">
         <div class="modal" (click)="$event.stopPropagation()">
           <h3>{{ editing() ? 'Edit Provider' : 'Add Provider' }}</h3>
-          @if (formErr()) { <div class="alert-err">{{ formErr() }}</div> }
-          <div class="field">
-            <label>Name *</label>
-            <input [(ngModel)]="form.name" placeholder="Dr. Maria Santos" />
-          </div>
-          <div class="field">
-            <label>Specialty *</label>
-            <input [(ngModel)]="form.specialty" placeholder="General Medicine" />
-          </div>
-          <div class="field">
-            <label>Slug <small>(optional — auto-generated if blank)</small></label>
-            <input [(ngModel)]="form.slug" placeholder="dr-maria-santos" />
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-gray" (click)="closeModal()">Cancel</button>
-            <button class="btn btn-blue" [disabled]="saving()" (click)="save()">
-              {{ saving() ? 'Saving…' : 'Save' }}
-            </button>
-          </div>
+          @if (formErr()) { <div class="alert-err" role="alert">{{ formErr() }}</div> }
+          <form [formGroup]="form" (ngSubmit)="save()">
+            <div class="field">
+              <label for="prov-name">Name *</label>
+              <input id="prov-name" formControlName="name" placeholder="Dr. Maria Santos" />
+            </div>
+            <div class="field">
+              <label for="prov-spec">Specialty *</label>
+              <input id="prov-spec" formControlName="specialty" placeholder="General Medicine" />
+            </div>
+            <div class="field">
+              <label for="prov-slug">Slug <small>(optional — auto-generated if blank)</small></label>
+              <input id="prov-slug" formControlName="slug" placeholder="dr-maria-santos" />
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
+              <button type="submit" class="btn btn-blue" [disabled]="saving() || form.invalid">
+                {{ saving() ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     }
@@ -132,6 +130,7 @@ interface ProviderForm {
 })
 export class ProvidersSectionComponent implements OnInit {
   private readonly api = inject(AdminApiService);
+  private readonly fb  = inject(FormBuilder);
 
   readonly providers    = signal<AdminProvider[]>([]);
   readonly loading      = signal(true);
@@ -142,7 +141,11 @@ export class ProvidersSectionComponent implements OnInit {
   readonly editing      = signal<AdminProvider | null>(null);
   readonly showInactive = signal(false);
 
-  form: ProviderForm = { name: '', specialty: '', slug: '' };
+  readonly form = this.fb.nonNullable.group({
+    name:      ['', [Validators.required]],
+    specialty: ['', [Validators.required]],
+    slug:      [''],
+  });
 
   ngOnInit(): void { this.load(); }
 
@@ -162,14 +165,14 @@ export class ProvidersSectionComponent implements OnInit {
 
   openCreate(): void {
     this.editing.set(null);
-    this.form = { name: '', specialty: '', slug: '' };
+    this.form.reset({ name: '', specialty: '', slug: '' });
     this.formErr.set(null);
     this.showModal.set(true);
   }
 
   openEdit(p: AdminProvider): void {
     this.editing.set(p);
-    this.form = { name: p.name, specialty: p.specialty, slug: p.slug };
+    this.form.reset({ name: p.name, specialty: p.specialty, slug: p.slug });
     this.formErr.set(null);
     this.showModal.set(true);
   }
@@ -177,17 +180,24 @@ export class ProvidersSectionComponent implements OnInit {
   closeModal(): void { this.showModal.set(false); }
 
   save(): void {
-    const { name, specialty, slug } = this.form;
-    if (!name.trim() || !specialty.trim()) {
+    if (this.saving()) return;
+
+    if (this.form.invalid) {
       this.formErr.set('Name and Specialty are required.');
       return;
     }
+
+    const { name, specialty, slug } = this.form.getRawValue();
     this.saving.set(true);
     this.formErr.set(null);
 
-    const body = { name: name.trim(), specialty: specialty.trim(), ...(slug.trim() ? { slug: slug.trim() } : {}) };
-    const p    = this.editing();
-    const req  = p ? this.api.updateProvider(p.id, body) : this.api.createProvider(body);
+    const body = {
+      name:      name.trim(),
+      specialty: specialty.trim(),
+      ...(slug.trim() ? { slug: slug.trim() } : {}),
+    };
+    const p   = this.editing();
+    const req = p ? this.api.updateProvider(p.id, body) : this.api.createProvider(body);
 
     req.subscribe({
       next: () => { this.saving.set(false); this.closeModal(); this.load(); },

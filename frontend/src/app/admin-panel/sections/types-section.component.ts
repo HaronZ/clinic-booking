@@ -3,16 +3,14 @@ import {
   inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AdminApiService, AdminAppointmentType, ApiError } from '../../services/admin-api.service';
-
-interface TypeForm { name: string; duration_minutes: number | null; slug: string; }
 
 @Component({
   selector: 'app-types-section',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display:block; padding:1.5rem; }
@@ -99,25 +97,27 @@ interface TypeForm { name: string; duration_minutes: number | null; slug: string
       <div class="modal-back" (click)="closeModal()">
         <div class="modal" (click)="$event.stopPropagation()">
           <h3>{{ editing() ? 'Edit Appointment Type' : 'Add Appointment Type' }}</h3>
-          @if (formErr()) { <div class="alert-err">{{ formErr() }}</div> }
-          <div class="field">
-            <label>Name *</label>
-            <input [(ngModel)]="form.name" placeholder="General Consultation" />
-          </div>
-          <div class="field">
-            <label>Duration (minutes) * <small>1–480</small></label>
-            <input type="number" [(ngModel)]="form.duration_minutes" min="1" max="480" placeholder="30" />
-          </div>
-          <div class="field">
-            <label>Slug <small>(optional)</small></label>
-            <input [(ngModel)]="form.slug" placeholder="general-consultation" />
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-gray" (click)="closeModal()">Cancel</button>
-            <button class="btn btn-blue" [disabled]="saving()" (click)="save()">
-              {{ saving() ? 'Saving…' : 'Save' }}
-            </button>
-          </div>
+          @if (formErr()) { <div class="alert-err" role="alert">{{ formErr() }}</div> }
+          <form [formGroup]="form" (ngSubmit)="save()">
+            <div class="field">
+              <label for="type-name">Name *</label>
+              <input id="type-name" formControlName="name" placeholder="General Consultation" />
+            </div>
+            <div class="field">
+              <label for="type-dur">Duration (minutes) * <small>1–480</small></label>
+              <input id="type-dur" type="number" formControlName="duration_minutes" min="1" max="480" placeholder="30" />
+            </div>
+            <div class="field">
+              <label for="type-slug">Slug <small>(optional)</small></label>
+              <input id="type-slug" formControlName="slug" placeholder="general-consultation" />
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
+              <button type="submit" class="btn btn-blue" [disabled]="saving() || form.invalid">
+                {{ saving() ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     }
@@ -125,6 +125,7 @@ interface TypeForm { name: string; duration_minutes: number | null; slug: string
 })
 export class TypesSectionComponent implements OnInit {
   private readonly api = inject(AdminApiService);
+  private readonly fb  = inject(FormBuilder);
 
   readonly types        = signal<AdminAppointmentType[]>([]);
   readonly loading      = signal(true);
@@ -135,7 +136,13 @@ export class TypesSectionComponent implements OnInit {
   readonly editing      = signal<AdminAppointmentType | null>(null);
   readonly showInactive = signal(false);
 
-  form: TypeForm = { name: '', duration_minutes: null, slug: '' };
+  // duration_minutes is bound as number | null because <input type="number">
+  // emits null when the field is empty. Validators clamp to 1–480.
+  readonly form = this.fb.nonNullable.group({
+    name:             ['', [Validators.required]],
+    duration_minutes: [null as number | null, [Validators.required, Validators.min(1), Validators.max(480)]],
+    slug:             [''],
+  });
 
   ngOnInit(): void { this.load(); }
 
@@ -152,14 +159,14 @@ export class TypesSectionComponent implements OnInit {
 
   openCreate(): void {
     this.editing.set(null);
-    this.form = { name: '', duration_minutes: null, slug: '' };
+    this.form.reset({ name: '', duration_minutes: null, slug: '' });
     this.formErr.set(null);
     this.showModal.set(true);
   }
 
   openEdit(t: AdminAppointmentType): void {
     this.editing.set(t);
-    this.form = { name: t.name, duration_minutes: t.duration_minutes, slug: t.slug };
+    this.form.reset({ name: t.name, duration_minutes: t.duration_minutes, slug: t.slug });
     this.formErr.set(null);
     this.showModal.set(true);
   }
@@ -167,18 +174,25 @@ export class TypesSectionComponent implements OnInit {
   closeModal(): void { this.showModal.set(false); }
 
   save(): void {
-    const { name, duration_minutes, slug } = this.form;
-    const dur = Number(duration_minutes);
-    if (!name.trim())                      { this.formErr.set('Name is required.'); return; }
-    if (!duration_minutes || isNaN(dur) || dur < 1 || dur > 480) {
-      this.formErr.set('Duration must be between 1 and 480 minutes.'); return;
+    if (this.saving()) return;
+
+    if (this.form.controls.name.invalid) {
+      this.formErr.set('Name is required.');
+      return;
     }
+    if (this.form.controls.duration_minutes.invalid) {
+      this.formErr.set('Duration must be between 1 and 480 minutes.');
+      return;
+    }
+    if (this.form.invalid) return;
+
+    const { name, duration_minutes, slug } = this.form.getRawValue();
     this.saving.set(true);
     this.formErr.set(null);
 
     const body = {
       name: name.trim(),
-      duration_minutes: dur,
+      duration_minutes: Number(duration_minutes),
       ...(slug.trim() ? { slug: slug.trim() } : {}),
     };
     const t   = this.editing();

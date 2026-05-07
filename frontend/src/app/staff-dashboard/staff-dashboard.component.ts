@@ -8,7 +8,6 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 
 import { ApiService, ApiError } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
@@ -17,7 +16,7 @@ import { ScheduleAppointment, ScheduleResponse } from '../models/staff.model';
 @Component({
   selector: 'app-staff-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   templateUrl: './staff-dashboard.component.html',
   styleUrls: ['./staff-dashboard.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,

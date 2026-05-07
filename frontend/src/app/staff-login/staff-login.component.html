@@ -3,16 +3,14 @@
     <h1>Staff Login</h1>
     <p class="subtitle">Clinic management portal</p>
 
-    <form (ngSubmit)="onSubmit()" #f="ngForm">
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
       <div class="field">
         <label for="username">Username</label>
         <input
           id="username"
           type="text"
           autocomplete="username"
-          [ngModel]="username()"
-          (ngModelChange)="username.set($event)"
-          name="username"
+          formControlName="username"
           required
           placeholder="e.g. ana.reyes"
         />
@@ -24,18 +22,16 @@
           id="password"
           type="password"
           autocomplete="current-password"
-          [ngModel]="password()"
-          (ngModelChange)="password.set($event)"
-          name="password"
+          formControlName="password"
           required
         />
       </div>
 
       @if (error()) {
-        <div class="alert-error">{{ error() }}</div>
+        <div class="alert-error" role="alert">{{ error() }}</div>
       }
 
-      <button type="submit" class="btn-primary" [disabled]="loading()">
+      <button type="submit" class="btn-primary" [disabled]="loading() || form.invalid">
         @if (loading()) { Signing in… } @else { Sign in }
       </button>
     </form>

@@ -3,16 +3,25 @@ import {
   Output, inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import {
+  AbstractControl, FormBuilder, ReactiveFormsModule,
+  ValidationErrors, ValidatorFn, Validators,
+} from '@angular/forms';
 
 import { AuthService } from '../services/auth.service';
 
-interface PwForm { current: string; newPw: string; confirm: string; }
+/** Cross-field validator: confirm field must match newPw. */
+const matchNewPasswordValidator: ValidatorFn = (group: AbstractControl): ValidationErrors | null => {
+  const newPw   = group.get('newPw')?.value as string;
+  const confirm = group.get('confirm')?.value as string;
+  if (!newPw || !confirm) return null;
+  return newPw === confirm ? null : { passwordMismatch: true };
+};
 
 @Component({
   selector: 'app-change-password',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display:flex; min-height:100vh; align-items:center; justify-content:center; background:#f3f4f6; font-family:system-ui,-apple-system,sans-serif; }
@@ -48,55 +57,78 @@ interface PwForm { current: string; newPw: string; confirm: string; }
         You must change the default password to access the admin panel.
       </div>
 
-      @if (error()) { <div class="alert-err">{{ error() }}</div> }
+      @if (error()) { <div class="alert-err" role="alert">{{ error() }}</div> }
 
-      <div class="field">
-        <label>Current Password</label>
-        <input type="password" [(ngModel)]="form.current" autocomplete="current-password" />
-      </div>
-      <div class="field">
-        <label>New Password <span style="color:#9ca3af;font-weight:400;font-size:.78rem">(min. 8 characters)</span></label>
-        <input type="password" [(ngModel)]="form.newPw" autocomplete="new-password" />
-      </div>
-      <div class="field">
-        <label>Confirm New Password</label>
-        <input type="password" [(ngModel)]="form.confirm" autocomplete="new-password" (keydown.enter)="submit()" />
-      </div>
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <div class="field">
+          <label for="cp-current">Current Password</label>
+          <input id="cp-current" type="password" formControlName="current" autocomplete="current-password" />
+        </div>
+        <div class="field">
+          <label for="cp-new">New Password <span style="color:#9ca3af;font-weight:400;font-size:.78rem">(min. 8 characters)</span></label>
+          <input id="cp-new" type="password" formControlName="newPw" autocomplete="new-password" />
+        </div>
+        <div class="field">
+          <label for="cp-confirm">Confirm New Password</label>
+          <input id="cp-confirm" type="password" formControlName="confirm" autocomplete="new-password" />
+        </div>
 
-      <button class="btn-submit" [disabled]="saving()" (click)="submit()">
-        {{ saving() ? 'Saving…' : 'Set Password & Continue' }}
-      </button>
+        <button type="submit" class="btn-submit" [disabled]="saving()">
+          {{ saving() ? 'Saving…' : 'Set Password & Continue' }}
+        </button>
+      </form>
     </div>
   `,
 })
 export class ChangePasswordComponent {
   private readonly auth = inject(AuthService);
+  private readonly fb   = inject(FormBuilder);
 
   /** Emitted when the password has been changed successfully. */
   @Output() changed = new EventEmitter<void>();
 
-  form: PwForm = { current: '', newPw: '', confirm: '' };
+  readonly form = this.fb.nonNullable.group(
+    {
+      current: ['', [Validators.required]],
+      newPw:   ['', [Validators.required, Validators.minLength(8)]],
+      confirm: ['', [Validators.required]],
+    },
+    { validators: matchNewPasswordValidator },
+  );
   readonly saving = signal(false);
   readonly error  = signal<string | null>(null);
 
   submit(): void {
     this.error.set(null);
-    const { current, newPw, confirm } = this.form;
 
-    if (!current)     { this.error.set('Current password is required.'); return; }
-    if (!newPw)       { this.error.set('New password is required.'); return; }
-    if (newPw.length < 8) { this.error.set('New password must be at least 8 characters.'); return; }
-    if (newPw !== confirm) { this.error.set('New passwords do not match.'); return; }
+    if (this.form.controls.current.invalid) {
+      this.error.set('Current password is required.');
+      return;
+    }
+    if (this.form.controls.newPw.hasError('required')) {
+      this.error.set('New password is required.');
+      return;
+    }
+    if (this.form.controls.newPw.hasError('minlength')) {
+      this.error.set('New password must be at least 8 characters.');
+      return;
+    }
+    if (this.form.hasError('passwordMismatch')) {
+      this.error.set('New passwords do not match.');
+      return;
+    }
+    if (this.form.invalid) return;
 
+    const { current, newPw } = this.form.getRawValue();
     this.saving.set(true);
     this.auth.changePassword(current, newPw).subscribe({
       next: () => {
         this.saving.set(false);
         this.changed.emit();
       },
-      error: (e: { message: string }) => {
+      error: (e: { message?: string }) => {
         this.saving.set(false);
-        this.error.set(e.message ?? 'Password change failed. Please try again.');
+        this.error.set(e?.message ?? 'Password change failed. Please try again.');
       },
     });
   }

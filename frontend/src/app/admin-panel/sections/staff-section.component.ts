@@ -3,21 +3,17 @@ import {
   inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AdminApiService, AdminProvider, AdminStaff, ApiError } from '../../services/admin-api.service';
 
-interface StaffForm {
-  username: string; name: string; password: string;
-  role: string; provider_id: string;
-}
-
 const ROLES = ['admin', 'receptionist', 'doctor'] as const;
+type Role = typeof ROLES[number];
 
 @Component({
   selector: 'app-staff-section',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display:block; padding:1.5rem; }
@@ -111,47 +107,49 @@ const ROLES = ['admin', 'receptionist', 'doctor'] as const;
       <div class="modal-back" (click)="closeModal()">
         <div class="modal" (click)="$event.stopPropagation()">
           <h3>{{ editing() ? 'Edit Staff Account' : 'Add Staff Account' }}</h3>
-          @if (formErr()) { <div class="alert-err">{{ formErr() }}</div> }
-          <div class="field">
-            <label>Username *</label>
-            <input [(ngModel)]="form.username" placeholder="ana.reyes" autocomplete="off" />
-          </div>
-          <div class="field">
-            <label>Full Name *</label>
-            <input [(ngModel)]="form.name" placeholder="Dr. Ana Reyes" />
-          </div>
-          <div class="field">
-            <label>
-              {{ editing() ? 'New Password' : 'Password *' }}
-              @if (editing()) { <small>(leave blank to keep current)</small> }
-            </label>
-            <input type="password" [(ngModel)]="form.password"
-                   [placeholder]="editing() ? '(unchanged)' : 'min. 8 characters'"
-                   autocomplete="new-password" />
-          </div>
-          <div class="field">
-            <label>Role *</label>
-            <select [(ngModel)]="form.role" (ngModelChange)="onRoleChange()">
-              @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
-            </select>
-          </div>
-          @if (form.role === 'doctor') {
+          @if (formErr()) { <div class="alert-err" role="alert">{{ formErr() }}</div> }
+          <form [formGroup]="form" (ngSubmit)="save()">
             <div class="field">
-              <label>Linked Provider *</label>
-              <select [(ngModel)]="form.provider_id">
-                <option value="">— Select provider —</option>
-                @for (p of providers(); track p.id) {
-                  <option [value]="p.id">{{ p.name }}</option>
-                }
+              <label for="staff-user">Username *</label>
+              <input id="staff-user" formControlName="username" placeholder="ana.reyes" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="staff-name">Full Name *</label>
+              <input id="staff-name" formControlName="name" placeholder="Dr. Ana Reyes" />
+            </div>
+            <div class="field">
+              <label for="staff-pw">
+                {{ editing() ? 'New Password' : 'Password *' }}
+                @if (editing()) { <small>(leave blank to keep current)</small> }
+              </label>
+              <input id="staff-pw" type="password" formControlName="password"
+                     [placeholder]="editing() ? '(unchanged)' : 'min. 8 characters'"
+                     autocomplete="new-password" />
+            </div>
+            <div class="field">
+              <label for="staff-role">Role *</label>
+              <select id="staff-role" formControlName="role">
+                @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
               </select>
             </div>
-          }
-          <div class="modal-actions">
-            <button class="btn btn-gray" (click)="closeModal()">Cancel</button>
-            <button class="btn btn-blue" [disabled]="saving()" (click)="save()">
-              {{ saving() ? 'Saving…' : 'Save' }}
-            </button>
-          </div>
+            @if (form.controls.role.value === 'doctor') {
+              <div class="field">
+                <label for="staff-provider">Linked Provider *</label>
+                <select id="staff-provider" formControlName="provider_id">
+                  <option value="">— Select provider —</option>
+                  @for (p of providers(); track p.id) {
+                    <option [value]="p.id">{{ p.name }}</option>
+                  }
+                </select>
+              </div>
+            }
+            <div class="modal-actions">
+              <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
+              <button type="submit" class="btn btn-blue" [disabled]="saving()">
+                {{ saving() ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     }
@@ -159,6 +157,7 @@ const ROLES = ['admin', 'receptionist', 'doctor'] as const;
 })
 export class StaffSectionComponent implements OnInit {
   private readonly api = inject(AdminApiService);
+  private readonly fb  = inject(FormBuilder);
 
   readonly staff        = signal<AdminStaff[]>([]);
   readonly providers    = signal<AdminProvider[]>([]);
@@ -171,11 +170,34 @@ export class StaffSectionComponent implements OnInit {
   readonly showInactive = signal(false);
 
   readonly roles = ROLES;
-  form: StaffForm = { username: '', name: '', password: '', role: 'receptionist', provider_id: '' };
+
+  // Password is required on Create, optional on Edit. We swap validators
+  // dynamically in openCreate / openEdit rather than using a giant cross-field
+  // validator — easier to reason about.
+  readonly form = this.fb.nonNullable.group({
+    username:    ['',                     [Validators.required]],
+    name:        ['',                     [Validators.required]],
+    password:    [''],
+    role:        ['receptionist' as Role, [Validators.required]],
+    provider_id: [''],
+  });
 
   ngOnInit(): void {
     this.load();
     this.api.getProviders(false).subscribe({ next: (list) => this.providers.set(list) });
+
+    // Clear provider_id whenever the role changes away from 'doctor', and
+    // require it whenever it lands on 'doctor'.
+    this.form.controls.role.valueChanges.subscribe((role) => {
+      const pid = this.form.controls.provider_id;
+      if (role === 'doctor') {
+        pid.addValidators(Validators.required);
+      } else {
+        pid.clearValidators();
+        pid.setValue('');
+      }
+      pid.updateValueAndValidity({ emitEvent: false });
+    });
   }
 
   load(): void {
@@ -195,33 +217,45 @@ export class StaffSectionComponent implements OnInit {
 
   openCreate(): void {
     this.editing.set(null);
-    this.form = { username: '', name: '', password: '', role: 'receptionist', provider_id: '' };
+    this.form.reset({ username: '', name: '', password: '', role: 'receptionist', provider_id: '' });
+    // Password required on create.
+    this.form.controls.password.setValidators([Validators.required, Validators.minLength(8)]);
+    this.form.controls.password.updateValueAndValidity({ emitEvent: false });
     this.formErr.set(null);
     this.showModal.set(true);
   }
 
   openEdit(s: AdminStaff): void {
     this.editing.set(s);
-    this.form = { username: s.username, name: s.name, password: '', role: s.role, provider_id: s.provider_id ?? '' };
+    this.form.reset({
+      username:    s.username,
+      name:        s.name,
+      password:    '',
+      role:        s.role as Role,
+      provider_id: s.provider_id ?? '',
+    });
+    // Password optional on edit, but if provided must still meet the min-length rule.
+    this.form.controls.password.setValidators([Validators.minLength(8)]);
+    this.form.controls.password.updateValueAndValidity({ emitEvent: false });
     this.formErr.set(null);
     this.showModal.set(true);
-  }
-
-  onRoleChange(): void {
-    if (this.form.role !== 'doctor') this.form.provider_id = '';
   }
 
   closeModal(): void { this.showModal.set(false); }
 
   save(): void {
+    if (this.saving()) return;
     this.formErr.set(null);
-    const { username, name, password, role, provider_id } = this.form;
+
+    const { username, name, password, role, provider_id } = this.form.getRawValue();
     const isEdit = !!this.editing();
 
-    if (!username.trim()) { this.formErr.set('Username is required.'); return; }
-    if (!name.trim())     { this.formErr.set('Name is required.'); return; }
-    if (!isEdit && !password) { this.formErr.set('Password is required.'); return; }
-    if (role === 'doctor' && !provider_id) { this.formErr.set('Doctor accounts must be linked to a provider.'); return; }
+    if (this.form.controls.username.invalid)            { this.formErr.set('Username is required.'); return; }
+    if (this.form.controls.name.invalid)                { this.formErr.set('Name is required.'); return; }
+    if (this.form.controls.password.hasError('required'))  { this.formErr.set('Password is required.'); return; }
+    if (this.form.controls.password.hasError('minlength')) { this.formErr.set('Password must be at least 8 characters.'); return; }
+    if (role === 'doctor' && !provider_id)              { this.formErr.set('Doctor accounts must be linked to a provider.'); return; }
+    if (this.form.invalid) return;
 
     this.saving.set(true);
     const s = this.editing();
