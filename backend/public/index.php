@@ -11,6 +11,7 @@ declare(strict_types=1);
  */
 
 use Clinic\Database\Connection;
+use Clinic\Exception\AuthorizationException;
 use Clinic\Exception\ConflictException;
 use Clinic\Exception\InvalidTransitionException;
 use Clinic\Exception\ValidationException;
@@ -24,6 +25,7 @@ use Clinic\Repository\StaffRepository;
 use Clinic\Service\AuthService;
 use Clinic\Service\AvailabilityService;
 use Clinic\Service\BookingService;
+use Clinic\Service\ProviderManagementService;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -38,6 +40,7 @@ $staffRepo    = new StaffRepository($pdo);
 $bookingSvc   = new BookingService($pdo, $providerRepo, $apptRepo);
 $availSvc     = new AvailabilityService($pdo, $apptRepo);
 $authSvc      = new AuthService($staffRepo);
+$providerMgmt = new ProviderManagementService($providerRepo);
 
 $router = new Router();
 
@@ -154,6 +157,51 @@ $router->register('GET', '/api/appointment-types', function () use ($pdo): void 
     Response::success($stmt->fetchAll());
 });
 
+// -------- Admin: providers (Phase 5 — admin panel) --------
+//
+// All /api/admin/* endpoints require an authenticated admin JWT.
+// Soft-delete only (is_active = 0). Slugs are auto-generated server-side.
+
+$router->register('GET', '/api/admin/providers', function (Request $req) use ($authSvc, $providerRepo): void {
+    $jwt = $authSvc->requireAuth();
+    $authSvc->requireRole($jwt, 'admin');
+
+    $includeInactive = $req->getQueryParam('include_inactive') === '1';
+    Response::success($providerRepo->findAll($includeInactive));
+});
+
+$router->register('POST', '/api/admin/providers', function (Request $req) use ($authSvc, $providerMgmt): void {
+    $jwt = $authSvc->requireAuth();
+    $authSvc->requireRole($jwt, 'admin');
+
+    $row = $providerMgmt->create($req->getBody());
+    Response::success($row, 201);
+});
+
+$router->register('PATCH', '/api/admin/providers/{id}', function (Request $req, array $params) use ($authSvc, $providerMgmt): void {
+    $jwt = $authSvc->requireAuth();
+    $authSvc->requireRole($jwt, 'admin');
+
+    $row = $providerMgmt->update($params['id'], $req->getBody());
+    Response::success($row);
+});
+
+$router->register('DELETE', '/api/admin/providers/{id}', function (Request $req, array $params) use ($authSvc, $providerMgmt): void {
+    $jwt = $authSvc->requireAuth();
+    $authSvc->requireRole($jwt, 'admin');
+
+    $providerMgmt->deactivate($params['id']);
+    Response::success(['id' => $params['id'], 'is_active' => 0]);
+});
+
+$router->register('POST', '/api/admin/providers/{id}/restore', function (Request $req, array $params) use ($authSvc, $providerMgmt): void {
+    $jwt = $authSvc->requireAuth();
+    $authSvc->requireRole($jwt, 'admin');
+
+    $providerMgmt->reactivate($params['id']);
+    Response::success(['id' => $params['id'], 'is_active' => 1]);
+});
+
 // -------- Availability (Phase 2) --------
 
 $router->register('GET', '/api/availability', function (Request $req) use ($availSvc): void {
@@ -178,6 +226,8 @@ $router->register('GET', '/api/availability', function (Request $req) use ($avai
 
 try {
     $router->dispatch(Request::fromGlobals());
+} catch (AuthorizationException $e) {
+    Response::error($e->getErrorCode(), $e->getMessage(), 403);
 } catch (ValidationException $e) {
     Response::error($e->getErrorCode(), $e->getMessage(), 422);
 } catch (ConflictException $e) {

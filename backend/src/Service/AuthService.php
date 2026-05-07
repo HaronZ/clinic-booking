@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Clinic\Service;
 
+use Clinic\Exception\AuthorizationException;
 use Clinic\Exception\ValidationException;
 use Clinic\Repository\StaffRepository;
 use Firebase\JWT\JWT;
@@ -72,6 +73,27 @@ final class AuthService
             return JWT::decode($token, new Key($this->secret, 'HS256'));
         } catch (\Throwable) {
             throw new ValidationException('UNAUTHORIZED', 'Invalid or expired token');
+        }
+    }
+
+    /**
+     * Assert that the JWT subject has one of the allowed roles.
+     * Throws AuthorizationException (HTTP 403) otherwise.
+     *
+     * Usage:
+     *   $jwt = $authSvc->requireAuth();
+     *   $authSvc->requireRole($jwt, 'admin');
+     *   // or accept multiple:
+     *   $authSvc->requireRole($jwt, 'admin', 'receptionist');
+     */
+    public function requireRole(stdClass $jwt, string ...$allowedRoles): void
+    {
+        $role = $jwt->role ?? null;
+        if (!is_string($role) || !in_array($role, $allowedRoles, true)) {
+            throw new AuthorizationException(
+                'FORBIDDEN',
+                'This action requires one of: ' . implode(', ', $allowedRoles),
+            );
         }
     }
 }
