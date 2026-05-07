@@ -16,6 +16,7 @@ final class Request
         private readonly array $query,
         /** @var array<string,mixed> */
         private readonly array $body,
+        private readonly string $clientIp = '',
     ) {}
 
     public static function fromGlobals(): self
@@ -43,7 +44,32 @@ final class Request
             }
         }
 
-        return new self($method, $path, $query, $body);
+        return new self($method, $path, $query, $body, self::extractClientIp($_SERVER));
+    }
+
+    /**
+     * Best-effort client IP extraction.
+     *
+     * Behind a trusted proxy (Railway, nginx, etc.) the originating client IP
+     * lives in the leftmost X-Forwarded-For entry; REMOTE_ADDR is the proxy
+     * itself. With no proxy we fall back to REMOTE_ADDR. X-Forwarded-For can
+     * be spoofed when there's no proxy in front, so a malicious caller could
+     * dodge the rate limit by rotating the header — that's an acceptable
+     * trade-off for an MVP-grade defense.
+     *
+     * @param array<string,mixed> $server
+     */
+    private static function extractClientIp(array $server): string
+    {
+        $xff = $server['HTTP_X_FORWARDED_FOR'] ?? '';
+        if (is_string($xff) && $xff !== '') {
+            $first = trim(explode(',', $xff)[0]);
+            if ($first !== '') {
+                return $first;
+            }
+        }
+        $remote = $server['REMOTE_ADDR'] ?? '';
+        return is_string($remote) ? $remote : '';
     }
 
     public function getMethod(): string
@@ -75,5 +101,17 @@ final class Request
     public function getBody(): array
     {
         return $this->body;
+    }
+
+    /**
+     * Best-effort originating client IP, or '' if unknown.
+     *
+     * Reads the leftmost entry of X-Forwarded-For when present (proxy-aware)
+     * and falls back to REMOTE_ADDR. Used by rate limiters; do not rely on
+     * this for audit logging since it can be spoofed without a trusted proxy.
+     */
+    public function getClientIp(): string
+    {
+        return $this->clientIp;
     }
 }

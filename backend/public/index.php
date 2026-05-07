@@ -14,6 +14,7 @@ use Clinic\Database\Connection;
 use Clinic\Exception\AuthorizationException;
 use Clinic\Exception\ConflictException;
 use Clinic\Exception\InvalidTransitionException;
+use Clinic\Exception\RateLimitException;
 use Clinic\Exception\ValidationException;
 use Clinic\Http\Request;
 use Clinic\Http\Response;
@@ -29,6 +30,7 @@ use Clinic\Service\AuthService;
 use Clinic\Service\AvailabilityService;
 use Clinic\Service\BookingService;
 use Clinic\Service\ProviderManagementService;
+use Clinic\Service\RateLimiter;
 use Clinic\Service\ScheduleManagementService;
 use Clinic\Service\StaffManagementService;
 
@@ -47,6 +49,7 @@ $staffRepo    = new StaffRepository($pdo);
 $bookingSvc   = new BookingService($pdo, $providerRepo, $apptRepo);
 $availSvc     = new AvailabilityService($pdo, $apptRepo);
 $authSvc      = new AuthService($staffRepo);
+$loginLimiter = new RateLimiter($pdo, maxAttempts: 5, windowSeconds: 300);
 $providerMgmt = new ProviderManagementService($providerRepo);
 $apptTypeMgmt = new AppointmentTypeService($apptTypeRepo);
 $scheduleMgmt = new ScheduleManagementService($providerRepo, $scheduleRepo);
@@ -56,7 +59,14 @@ $router = new Router();
 
 // -------- Auth (Phase 4) --------
 
-$router->register('POST', '/api/auth/login', function (Request $req) use ($authSvc): void {
+$router->register('POST', '/api/auth/login', function (Request $req) use ($authSvc, $loginLimiter): void {
+    // Rate-limit BEFORE looking at the body, so attackers can't burn cycles
+    // probing usernames once they're locked out. Keyed on client IP; legit
+    // users on the same NAT will share a budget, which is acceptable for an
+    // MVP (5 attempts / 5 min is generous for human typing).
+    $ip = $req->getClientIp();
+    $loginLimiter->enforce($ip);
+
     $body     = $req->getBody();
     $username = isset($body['username']) ? trim((string) $body['username']) : '';
     $password = (string) ($body['password'] ?? '');
@@ -65,7 +75,15 @@ $router->register('POST', '/api/auth/login', function (Request $req) use ($authS
         Response::error('MISSING_FIELD', 'username and password are required', 400);
     }
 
-    $result = $authSvc->login($username, $password);
+    try {
+        $result = $authSvc->login($username, $password);
+    } catch (ValidationException $e) {
+        // Only failed attempts count toward the budget — successful logins
+        // don't penalize users who type fast.
+        $loginLimiter->record($ip);
+        throw $e;
+    }
+
     Response::success($result);
 });
 
@@ -356,6 +374,11 @@ try {
     Response::error($e->getErrorCode(), $e->getMessage(), 409);
 } catch (InvalidTransitionException $e) {
     Response::error($e->getErrorCode(), $e->getMessage(), 422);
+} catch (RateLimitException $e) {
+    if (!headers_sent()) {
+        header('Retry-After: ' . $e->getRetryAfterSeconds());
+    }
+    Response::error($e->getErrorCode(), $e->getMessage(), 429);
 } catch (Throwable $e) {
     // Privacy: never echo $e->getMessage() to the client; it may contain SQL or PII.
     error_log('[index.php] Uncaught: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());

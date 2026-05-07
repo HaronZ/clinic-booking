@@ -99,4 +99,15 @@ CREATE TABLE IF NOT EXISTS staff_users (
     REFERENCES providers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ── 6. auth_attempts ──────────────────────────────────────────────────────────
+-- Backs the per-IP rate limiter on POST /api/auth/login. IPs are SHA-256
+-- hashed before insert so we never persist a raw client IP.
+CREATE TABLE IF NOT EXISTS auth_attempts (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  ip_hash     CHAR(64)        NOT NULL COMMENT 'SHA-256 of client IP — never stored in plaintext',
+  attempt_at  DATETIME        NOT NULL,
+  CONSTRAINT pk_auth_attempts PRIMARY KEY (id),
+  INDEX idx_auth_attempts_ip_attempt (ip_hash, attempt_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

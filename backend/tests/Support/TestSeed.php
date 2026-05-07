@@ -25,6 +25,13 @@ final class TestSeed
         $pdo->exec('TRUNCATE TABLE appointment_types');
         $pdo->exec('TRUNCATE TABLE providers');
         $pdo->exec('TRUNCATE TABLE staff_users');
+        // auth_attempts may not exist on older test DBs that haven't been
+        // migrated through 007 yet — guard so reset() still works.
+        try {
+            $pdo->exec('TRUNCATE TABLE auth_attempts');
+        } catch (\PDOException) {
+            // table missing; tests that don't touch RateLimiter don't care
+        }
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
     }
 
