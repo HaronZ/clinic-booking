@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS providers (
   CONSTRAINT uq_providers_slug  UNIQUE (slug)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS idx_providers_active ON providers (is_active);
+CREATE INDEX idx_providers_active ON providers (is_active);
 
 -- ── 2. appointment_types ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS appointment_types (
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS provider_schedules (
   CONSTRAINT chk_ps_day            CHECK (day_of_week BETWEEN 0 AND 6)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS idx_ps_provider_day ON provider_schedules (provider_id, day_of_week);
+CREATE INDEX idx_ps_provider_day ON provider_schedules (provider_id, day_of_week);
 
 -- ── 4. appointments ───────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS appointments (
@@ -79,8 +79,8 @@ CREATE TABLE IF NOT EXISTS appointments (
   CONSTRAINT chk_appt_times    CHECK (end_time > start_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS idx_appt_provider_times ON appointments (provider_id, start_time, end_time);
-CREATE INDEX IF NOT EXISTS idx_appt_status         ON appointments (status);
+CREATE INDEX idx_appt_provider_times ON appointments (provider_id, start_time, end_time);
+CREATE INDEX idx_appt_status         ON appointments (status);
 
 -- ── 5. staff_users ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS staff_users (
