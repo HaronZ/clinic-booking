@@ -75,8 +75,19 @@ function runSqlFile(PDO $pdo, string $file, string $label): void
     echo "Running {$label} ...\n";
 
     $statements = array_filter(
-        array_map('trim', explode(';', (string) file_get_contents($file))),
-        fn(string $s) => $s !== '' && !preg_match('/^--/', $s),
+        array_map(function (string $s): string {
+            $s = trim($s);
+            // Strip leading -- comment lines so SQL that follows isn't skipped.
+            // Without this, a migration file that starts with comments becomes a
+            // single chunk (after splitting on ;) whose first character is '-',
+            // and the old /^--/ filter would silently discard the whole thing.
+            $lines = explode("\n", $s);
+            while ($lines && str_starts_with(trim($lines[0]), '--')) {
+                array_shift($lines);
+            }
+            return trim(implode("\n", $lines));
+        }, explode(';', (string) file_get_contents($file))),
+        fn(string $s) => $s !== '',
     );
 
     $count = 0;
