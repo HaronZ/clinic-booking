@@ -129,22 +129,39 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS clinic_booking CHARACTER SET 
 
 Then choose **one** of the following:
 
-**Option A — Real clinic (empty, your own data)**
-```bash
-php backend/scripts/migrate.php
-```
-Creates all tables with no data. Add your own doctors, appointment types,
-and staff directly in MySQL.
+---
 
-**Option B — Try the demo / portfolio (pre-filled sample data)**
+#### 🏥 Option A — Real clinic (your own doctors and data)
+
+```bash
+# 1. Create the tables (empty — no demo data)
+php backend/scripts/migrate.php
+
+# 2. Open the setup template and fill in YOUR clinic's data
+#    (doctors, appointment types, schedules, staff accounts)
+#    Every line that needs editing is marked with  <-- CHANGE THIS
+notepad backend/db/setup_clinic.sql        # Windows
+# or: nano backend/db/setup_clinic.sql    # Mac/Linux
+
+# 3. Run your filled-in file
+mysql -u root -p clinic_booking < backend/db/setup_clinic.sql
+```
+
+The template walks you through everything step by step — no SQL knowledge required.
+
+---
+
+#### 🎮 Option B — Try the demo (sample data, same as live site)
+
 ```bash
 php backend/scripts/migrate.php --demo
 ```
-Creates tables AND loads sample data identical to the live demo:
+
+Loads sample data instantly:
 - 2 doctors (Dr. Ana Reyes, Dr. Luis Mendoza)
 - 3 appointment types (General Consultation, Follow-up Visit, Annual Physical)
 - Doctor schedules for the week
-- 4 staff accounts (see login table below)
+- 4 staff accounts (see table below)
 
 ---
 
