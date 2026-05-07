@@ -3,6 +3,7 @@ export interface StaffInfo {
   name: string;
   role: 'admin' | 'receptionist' | 'doctor';
   provider_id: string | null;
+  must_change_password: boolean;
 }
 
 export interface LoginResponse {

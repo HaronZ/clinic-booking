@@ -6,13 +6,15 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-import { BookingComponent }        from './booking/booking.component';
-import { ConfirmationComponent }   from './confirmation/confirmation.component';
-import { StaffLoginComponent }     from './staff-login/staff-login.component';
-import { StaffDashboardComponent } from './staff-dashboard/staff-dashboard.component';
-import { AuthService }             from './services/auth.service';
+import { BookingComponent }          from './booking/booking.component';
+import { ConfirmationComponent }     from './confirmation/confirmation.component';
+import { StaffLoginComponent }       from './staff-login/staff-login.component';
+import { StaffDashboardComponent }   from './staff-dashboard/staff-dashboard.component';
+import { AdminPanelComponent }       from './admin-panel/admin-panel.component';
+import { ChangePasswordComponent }   from './change-password/change-password.component';
+import { AuthService }               from './services/auth.service';
 
-type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard';
+type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard' | 'admin-panel' | 'change-password';
 
 @Component({
   selector: 'app-root',
@@ -23,6 +25,8 @@ type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard';
     ConfirmationComponent,
     StaffLoginComponent,
     StaffDashboardComponent,
+    AdminPanelComponent,
+    ChangePasswordComponent,
   ],
   template: `
     <!-- Patient-facing views -->
@@ -36,7 +40,11 @@ type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard';
     @if (view() === 'staff-login') {
       <app-staff-login (loggedIn)="onLoggedIn()" />
     } @else if (view() === 'staff-dashboard') {
-      <app-staff-dashboard (loggedOut)="onLoggedOut()" />
+      <app-staff-dashboard (loggedOut)="onLoggedOut()" (goAdmin)="view.set('admin-panel')" />
+    } @else if (view() === 'admin-panel') {
+      <app-admin-panel (loggedOut)="onLoggedOut()" (goDashboard_)="view.set('staff-dashboard')" />
+    } @else if (view() === 'change-password') {
+      <app-change-password (changed)="onPasswordChanged()" />
     }
 
     <!-- Tiny nav link for staff -->
@@ -64,10 +72,8 @@ type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard';
 export class AppComponent {
   private readonly auth = inject(AuthService);
 
-  readonly view      = signal<View>(
-    this.auth.isLoggedIn() ? 'staff-dashboard' : 'booking',
-  );
   readonly bookingId = signal<string | null>(null);
+  readonly view      = signal<View>(this.initialView());
 
   onBookingCreated(id: string): void {
     this.bookingId.set(id);
@@ -76,14 +82,39 @@ export class AppComponent {
 
   goToStaff(e: Event): void {
     e.preventDefault();
-    this.view.set(this.auth.isLoggedIn() ? 'staff-dashboard' : 'staff-login');
+    this.view.set(this.auth.isLoggedIn() ? this.staffHome() : 'staff-login');
   }
 
   onLoggedIn(): void {
-    this.view.set('staff-dashboard');
+    this.view.set(this.staffHome());
   }
 
   onLoggedOut(): void {
     this.view.set('staff-login');
+  }
+
+  onPasswordChanged(): void {
+    // Password changed — token is already refreshed in auth.service.
+    // Send admin to the admin panel; others to the staff dashboard.
+    const staff = this.auth.staff();
+    this.view.set(staff?.role === 'admin' ? 'admin-panel' : 'staff-dashboard');
+  }
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+
+  /**
+   * Where to land immediately after login (or on page reload when still logged in).
+   * Force-change check: if must_change_password, send to change-password first.
+   */
+  private staffHome(): View {
+    const staff = this.auth.staff();
+    if (!staff) return 'staff-login';
+    if (staff.must_change_password) return 'change-password';
+    return staff.role === 'admin' ? 'admin-panel' : 'staff-dashboard';
+  }
+
+  private initialView(): View {
+    if (!this.auth.isLoggedIn()) return 'booking';
+    return this.staffHome();
   }
 }

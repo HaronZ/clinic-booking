@@ -2,12 +2,12 @@
 
 > Vanilla PHP 8.2 · MySQL 8 · Angular 17 · Deployed on Railway · MIT License
 
-A production-ready clinic appointment booking system with a patient booking wizard, staff dashboard, JWT authentication, and email notifications.
+A production-ready clinic appointment booking system. Patients book appointments online; staff manage schedules through a dashboard; admins configure the entire clinic — providers, appointment types, schedules, and staff accounts — through a built-in admin panel. No SQL required after the initial setup.
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-railway.app-blueviolet)](https://clinic-booking-production.up.railway.app)
 [![PHP 8.2](https://img.shields.io/badge/PHP-8.2-blue)](https://www.php.net/)
 [![Angular 17](https://img.shields.io/badge/Angular-17-red)](https://angular.io/)
-[![Tests](https://img.shields.io/badge/tests-21%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-101%20passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -16,12 +16,13 @@ A production-ready clinic appointment booking system with a patient booking wiza
 
 **[https://clinic-booking-production.up.railway.app](https://clinic-booking-production.up.railway.app)**
 
-| Role | Username | Password |
-|------|----------|----------|
-| Patient | *(no login needed)* | — just open the link |
-| Doctor | `ana.reyes` | `doctor123` |
-| Receptionist | `reception` | `reception123` |
-| Admin | `admin` | `admin123` |
+| Role | Username | Password | Note |
+|------|----------|----------|------|
+| Patient | *(no login needed)* | — | Just open the link |
+| Admin | `admin` | `admin123` | First login forces a password change |
+| Receptionist | `reception` | `reception123` | Staff dashboard |
+| Doctor | `ana.reyes` | `doctor123` | Doctor view (own schedule only) |
+| Doctor | `luis.mendoza` | `doctor123` | Doctor view |
 
 > Staff login is at the bottom of the booking page.
 
@@ -35,13 +36,14 @@ A production-ready clinic appointment booking system with a patient booking wiza
 | Double-booking prevention (`SELECT … FOR UPDATE`) | ✅ |
 | Real-time slot availability | ✅ |
 | Booking confirmation page | ✅ |
-| Patient cancellation | ✅ |
-| Staff login (JWT, 12h TTL) | ✅ |
+| Staff login (JWT, 12 h TTL) | ✅ |
 | Staff schedule dashboard | ✅ |
 | Confirm / Complete / Cancel from dashboard | ✅ |
+| **Admin panel — manage providers, types, schedules, staff** | ✅ |
+| **Forced first-login password change** | ✅ |
 | Email confirmations (PHPMailer, SMTP) | ✅ |
 | Mobile-responsive CSS | ✅ |
-| 21 PHPUnit tests | ✅ |
+| 101 PHPUnit tests | ✅ |
 
 ---
 
@@ -50,29 +52,34 @@ A production-ready clinic appointment booking system with a patient booking wiza
 ```
 backend/
   db/
-    migrations/       001–005 SQL migrations
-    seed.sql          Provider + appointment type data
-    seed_staff.sql    Dev staff accounts (4 users)
+    migrations/       001–006 SQL migrations (run automatically)
+    schema.sql        Table definitions
+    seed_demo.sql     Demo data (2 doctors, 3 types, 4 staff)
+    setup_clinic.sql  Deprecated SQL template (see admin panel instead)
   src/
     Database/         PDO singleton
-    Exception/        ValidationException, ConflictException, InvalidTransitionException
+    Exception/        ValidationException, ConflictException, AuthorizationException, …
     Http/             Router, Request, Response
-    Repository/       AppointmentRepository, AvailabilityRepository, ProviderRepository, StaffRepository
-    Service/          AuthService (JWT), AvailabilityService, BookingService, EmailService
+    Repository/       Appointment, Provider, AppointmentType, Schedule, Staff repos
+    Service/          AuthService (JWT), BookingService, AvailabilityService,
+                      ProviderManagementService, AppointmentTypeService,
+                      ScheduleManagementService, StaffManagementService
+    Util/             Slug (accent-folded slug generation)
   public/index.php    Front controller (all routes)
-  tests/              PHPUnit — BookingServiceTest, AvailabilityServiceTest
-  .env                Local config (never commit with real secrets)
+  tests/              101 PHPUnit unit tests
+  scripts/migrate.php Migration runner (tables + optional demo data)
 
 frontend/
   src/app/
     booking/          5-step patient booking wizard
-    confirmation/     Booking confirmation + cancel button
+    confirmation/     Booking confirmation
     staff-login/      Staff authentication form
     staff-dashboard/  Schedule table with action buttons
+    admin-panel/      Admin shell + Providers / Types / Schedules / Staff tabs
+    change-password/  First-login forced password change
+    services/         ApiService, AuthService, AdminApiService
     models/           TypeScript interfaces
-    services/         ApiService, AuthService
 
-SPEC.md               Clinic configuration (providers, types, schedules)
 CLAUDE.md             Architecture rules — read before modifying
 ```
 
@@ -87,7 +94,7 @@ CLAUDE.md             Architecture rules — read before modifying
 
 ---
 
-## Quick start (3 steps)
+## Quick start (4 steps)
 
 ### 1 — Clone and install
 
@@ -95,10 +102,7 @@ CLAUDE.md             Architecture rules — read before modifying
 git clone https://github.com/HaronZ/clinic-booking.git
 cd clinic-booking
 
-# Install PHP dependencies
 cd backend && composer install && cd ..
-
-# Install Angular dependencies
 cd frontend && npm install && cd ..
 ```
 
@@ -109,90 +113,71 @@ cd backend
 cp .env.example .env
 ```
 
-Edit `.env` with your local MySQL credentials:
+Edit `.env` with your MySQL credentials and a strong JWT secret:
 
 ```ini
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_NAME=clinic_booking
-DB_USER=root          # your MySQL username
-DB_PASS=              # your MySQL password
-JWT_SECRET=any-random-string-here
+DB_USER=root
+DB_PASS=yourpassword
+JWT_SECRET=change-this-to-a-64-char-random-string
 ```
 
-### 3 — Create database + run migrations
+### 3 — Create database and load data
 
 ```bash
-# Create the database
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS clinic_booking CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-```
 
-Then choose **one** of the following:
-
----
-
-#### 🏥 Option A — Real clinic (your own doctors and data)
-
-```bash
-# 1. Create the tables (empty — no demo data)
-php backend/scripts/migrate.php
-
-# 2. Open the setup template and fill in YOUR clinic's data
-#    (doctors, appointment types, schedules, staff accounts)
-#    Every line that needs editing is marked with  <-- CHANGE THIS
-notepad backend/db/setup_clinic.sql        # Windows
-# or: nano backend/db/setup_clinic.sql    # Mac/Linux
-
-# 3. Run your filled-in file
-mysql -u root -p clinic_booking < backend/db/setup_clinic.sql
-```
-
-The template walks you through everything step by step — no SQL knowledge required.
-
----
-
-#### 🎮 Option B — Try the demo (sample data, same as live site)
-
-```bash
+# For exploring / development (loads demo providers, types, and staff):
 php backend/scripts/migrate.php --demo
+
+# For a real clinic (empty database — configure via admin panel):
+php backend/scripts/migrate.php
 ```
 
-Loads sample data instantly:
-- 2 doctors (Dr. Ana Reyes, Dr. Luis Mendoza)
-- 3 appointment types (General Consultation, Follow-up Visit, Annual Physical)
-- Doctor schedules for the week
-- 4 staff accounts (see table below)
-
----
-
-## Running locally
+### 4 — Start the servers
 
 Open **two terminals**:
 
 ```bash
 # Terminal 1 — PHP API (port 8080)
-cd backend
-php -S localhost:8080 -t public
+php -S localhost:8080 -t backend/public
 
 # Terminal 2 — Angular dev server (port 4200)
-cd frontend
-npm start
+cd frontend && npm start
 ```
 
 Open **http://localhost:4200**
 
 ---
 
-## Default dev accounts
+## Setting up a real clinic (admin panel)
+
+If you ran `migrate.php` without `--demo`, log in as the initial admin to configure everything via the UI — no SQL editing required:
+
+1. Click **"Staff login"** at the bottom of the booking page.
+2. Log in as `admin` / `admin123`.
+3. You'll be redirected to **Set Your Password** (forced first-login change).
+4. After setting your password, you land on the **Admin Panel**.
+5. Use the four tabs to configure:
+   - **Providers** — add your doctors with names and specialties
+   - **Appointment Types** — define visit types and durations (1–480 min)
+   - **Schedules** — set each doctor's weekly working hours (7-day grid)
+   - **Staff Accounts** — create receptionist and doctor login accounts
+
+> The default `admin/admin123` credentials are intentionally blocked from production use by the forced password-change requirement.
+
+---
+
+## Default demo accounts
 
 | Username | Password | Role |
 |---|---|---|
-| `admin` | `admin123` | Admin |
+| `admin` | `admin123` | Admin (first login forces password change) |
 | `reception` | `reception123` | Receptionist |
-| `ana.reyes` | `doctor123` | Doctor (Dr. Ana Reyes) |
-| `luis.mendoza` | `doctor123` | Doctor (Dr. Luis Mendoza) |
-
-Click **"Staff login"** at the bottom of the booking page to access the staff portal.
+| `ana.reyes` | `doctor123` | Doctor (linked to Dr. Ana Reyes) |
+| `luis.mendoza` | `doctor123` | Doctor (linked to Dr. Luis Mendoza) |
 
 ---
 
@@ -200,43 +185,64 @@ Click **"Staff login"** at the bottom of the booking page to access the staff po
 
 ```bash
 cd backend
-./vendor/bin/phpunit --testdox
+php vendor/phpunit/phpunit/phpunit --testdox
 ```
 
-Expected output: **21 tests, 54 assertions** — all green.
+Expected: **101 tests, 201+ assertions** — all green.
 
 ---
 
 ## Email configuration
 
-By default, `MAIL_ENABLED=0` in `.env` — emails are logged instead of sent (check `php -S` console output). To enable real email:
+By default `MAIL_ENABLED=0` — emails are skipped. To enable:
 
 ```ini
 MAIL_ENABLED=1
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USER=your-account@gmail.com
-MAIL_PASS=your-16-char-app-password   # Google Account → App passwords
+MAIL_PASS=your-16-char-app-password
 MAIL_FROM=noreply@yourclinic.com
-MAIL_FROM_NAME="Clinic Booking"
+MAIL_FROM_NAME="Your Clinic"
 ```
 
 ---
 
 ## API reference
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/api/auth/login` | — | Login, returns JWT |
-| `GET` | `/api/providers` | — | List active providers |
-| `GET` | `/api/appointment-types` | — | List active types |
-| `GET` | `/api/availability` | — | Available slots for date |
-| `POST` | `/api/bookings` | — | Create booking |
-| `GET` | `/api/bookings/{id}` | — | Get booking (no PII) |
-| `PATCH` | `/api/bookings/{id}/status` | JWT | Update status |
-| `GET` | `/api/staff/schedule` | JWT | Staff schedule |
+### Public endpoints (no auth)
 
-All responses: `{ "data": ..., "meta": {} }` or `{ "error": { "code": "SCREAMING_SNAKE", "message": "..." }, "meta": {} }`
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/providers` | List active providers |
+| `GET` | `/api/appointment-types` | List active types |
+| `GET` | `/api/availability` | Available slots for a date |
+| `POST` | `/api/bookings` | Create booking |
+| `GET` | `/api/bookings/{id}` | Get booking (no PII) |
+
+### Staff endpoints (JWT)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/auth/login` | Login, returns JWT + staff info |
+| `POST` | `/api/auth/change-password` | Change password, returns fresh JWT |
+| `GET` | `/api/staff/schedule` | Today's appointments |
+| `PATCH` | `/api/bookings/{id}/status` | Update booking status |
+
+### Admin endpoints (JWT, admin role)
+
+| Method | Path | Description |
+|---|---|---|
+| `GET/POST` | `/api/admin/providers` | List / create providers |
+| `PATCH/DELETE` | `/api/admin/providers/{id}` | Update / soft-delete |
+| `POST` | `/api/admin/providers/{id}/restore` | Reactivate |
+| `GET/PUT` | `/api/admin/providers/{id}/schedule` | View / replace schedule |
+| `GET/POST` | `/api/admin/appointment-types` | List / create types |
+| `PATCH/DELETE` | `/api/admin/appointment-types/{id}` | Update / soft-delete |
+| `GET/POST` | `/api/admin/staff` | List / create staff |
+| `PATCH/DELETE` | `/api/admin/staff/{id}` | Update / soft-delete |
+
+All responses use the envelope: `{ "data": …, "meta": {} }` or `{ "error": { "code": "SCREAMING_SNAKE", "message": "…" }, "meta": {} }`
 
 ---
 
@@ -245,13 +251,16 @@ All responses: `{ "data": ..., "meta": {} }` or `{ "error": { "code": "SCREAMING
 | Decision | Rationale |
 |---|---|
 | UUID PKs | No enumeration attacks, safe for external APIs |
-| `SELECT … FOR UPDATE` | Only correct double-booking guard under concurrent writes in MySQL |
-| Server-derived `end_time` | Client can't sneak in arbitrary durations |
+| `SELECT … FOR UPDATE` | Only correct double-booking guard under concurrent writes |
+| Server-derived `end_time` | Client cannot send arbitrary durations |
 | Explicit status allow-list | Prevents invalid transitions (e.g. `completed → pending`) |
-| No ORM | 800 lines of PHP total — an ORM would triple it for no benefit |
-| PII never logged | patient_name/email only in DB; never in logs, never in non-staff API responses |
+| Soft-delete only | Appointments reference providers — hard-delete would orphan history |
+| Slug auto-generation | Server prevents duplicates with `-2`, `-3` suffix strategy |
+| `must_change_password` flag | Default credentials can never survive into production unchanged |
+| No ORM | ~1 000 lines of PHP total — an ORM adds complexity with no benefit |
+| PII never logged | `patient_name`/`patient_email` only in DB and direct HTTP response |
 
-See `CLAUDE.md` for the full rule set.
+See `CLAUDE.md` for the complete rule set.
 
 ---
 
@@ -259,12 +268,18 @@ See `CLAUDE.md` for the full rule set.
 
 - [ ] Change `JWT_SECRET` to a 64-char random string
 - [ ] Set `APP_ENV=production`
-- [ ] Enable HTTPS (nginx/Caddy), set HSTS
-- [ ] Set `MAIL_ENABLED=1` and configure real SMTP credentials
-- [ ] Restrict MySQL user: `GRANT SELECT, INSERT, UPDATE ON clinic_booking.* TO ...`
-- [ ] Remove `seed_staff.sql` default accounts; create real user accounts
+- [ ] Enable HTTPS (nginx / Caddy), set HSTS header
+- [ ] Set `MAIL_ENABLED=1` with real SMTP credentials
+- [ ] Restrict MySQL user: `GRANT SELECT, INSERT, UPDATE ON clinic_booking.* TO …`
+- [ ] Log in as admin, **change the default password**, then create real staff accounts
 - [ ] Set PHP `display_errors=Off`, `log_errors=On`
-- [ ] Add rate limiting on `/api/bookings` (nginx `limit_req`)
+- [ ] Add rate limiting on `/api/auth/login` (nginx `limit_req`)
+
+---
+
+## Advanced — bulk SQL setup (deprecated)
+
+`backend/db/setup_clinic.sql` is a fill-in-the-blanks SQL template for power users who prefer bulk-loading clinic data via SQL rather than the admin panel. It is kept for backward compatibility but no longer the recommended path.
 
 ---
 

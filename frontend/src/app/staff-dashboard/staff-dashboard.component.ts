@@ -26,7 +26,8 @@ export class StaffDashboardComponent implements OnInit {
   private readonly api  = inject(ApiService);
   private readonly auth = inject(AuthService);
 
-  @Output() loggedOut = new EventEmitter<void>();
+  @Output() loggedOut  = new EventEmitter<void>();
+  @Output() goAdmin    = new EventEmitter<void>();
 
   readonly staff     = this.auth.staff;
   readonly schedule  = signal<ScheduleResponse | null>(null);
@@ -95,6 +96,10 @@ export class StaffDashboardComponent implements OnInit {
   logout(): void {
     this.auth.logout();
     this.loggedOut.emit();
+  }
+
+  navigateToAdmin(): void {
+    this.goAdmin.emit();
   }
 
   /** Which action buttons are valid for a given status */

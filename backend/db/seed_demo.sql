@@ -44,8 +44,10 @@ INSERT IGNORE INTO provider_schedules (id, provider_id, day_of_week, start_time,
 --   luis.mendoza → doctor123
 --
 -- IMPORTANT: Change all passwords before using in a real clinic.
-INSERT IGNORE INTO staff_users (id, username, name, password, provider_id, role) VALUES
-  ('10000000-0000-0000-0000-000000000001', 'admin',        'Admin User',       '$2y$12$x8/M.LSoSOONSE88rDVe9.OGRVqyGkIYCxy1nAuxi.TZ8V9Pc6XD6', NULL,                                   'admin'),
-  ('10000000-0000-0000-0000-000000000002', 'reception',    'Front Desk',       '$2y$12$HjAuDdopQ2wGuiC1eTHGKOIdSmV3pzScT3TTTuNimycBqIDVz8vGa', NULL,                                   'receptionist'),
-  ('10000000-0000-0000-0000-000000000003', 'ana.reyes',    'Dr. Ana Reyes',    '$2y$12$1SHGnkONSDfSGUIiUt/3muOcOMr02lND./nKUNll4xV4QDk.7Vy8.', '11111111-1111-1111-1111-111111111111', 'doctor'),
-  ('10000000-0000-0000-0000-000000000004', 'luis.mendoza', 'Dr. Luis Mendoza', '$2y$12$1SHGnkONSDfSGUIiUt/3muOcOMr02lND./nKUNll4xV4QDk.7Vy8.', '22222222-2222-2222-2222-222222222222', 'doctor');
+-- The admin row sets must_change_password = 1 so the very first login forces
+-- a password change, ensuring the public default never lingers in production.
+INSERT IGNORE INTO staff_users (id, username, name, password, provider_id, role, must_change_password) VALUES
+  ('10000000-0000-0000-0000-000000000001', 'admin',        'Admin User',       '$2y$12$x8/M.LSoSOONSE88rDVe9.OGRVqyGkIYCxy1nAuxi.TZ8V9Pc6XD6', NULL,                                   'admin',        1),
+  ('10000000-0000-0000-0000-000000000002', 'reception',    'Front Desk',       '$2y$12$HjAuDdopQ2wGuiC1eTHGKOIdSmV3pzScT3TTTuNimycBqIDVz8vGa', NULL,                                   'receptionist', 0),
+  ('10000000-0000-0000-0000-000000000003', 'ana.reyes',    'Dr. Ana Reyes',    '$2y$12$1SHGnkONSDfSGUIiUt/3muOcOMr02lND./nKUNll4xV4QDk.7Vy8.', '11111111-1111-1111-1111-111111111111', 'doctor',       0),
+  ('10000000-0000-0000-0000-000000000004', 'luis.mendoza', 'Dr. Luis Mendoza', '$2y$12$1SHGnkONSDfSGUIiUt/3muOcOMr02lND./nKUNll4xV4QDk.7Vy8.', '22222222-2222-2222-2222-222222222222', 'doctor',       0);

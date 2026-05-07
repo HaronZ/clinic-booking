@@ -84,14 +84,15 @@ CREATE INDEX idx_appt_status         ON appointments (status);
 
 -- ── 5. staff_users ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS staff_users (
-  id          CHAR(36)     NOT NULL,
-  username    VARCHAR(80)  NOT NULL,
-  name        VARCHAR(120) NOT NULL,
-  password    VARCHAR(255) NOT NULL  COMMENT 'password_hash() — never plaintext',
-  provider_id CHAR(36)     NULL      COMMENT 'linked doctor; null = receptionist/admin',
-  role        ENUM('admin','receptionist','doctor') NOT NULL DEFAULT 'receptionist',
-  is_active   TINYINT(1)   NOT NULL DEFAULT 1,
-  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id                   CHAR(36)     NOT NULL,
+  username             VARCHAR(80)  NOT NULL,
+  name                 VARCHAR(120) NOT NULL,
+  password             VARCHAR(255) NOT NULL  COMMENT 'password_hash() — never plaintext',
+  provider_id          CHAR(36)     NULL      COMMENT 'linked doctor; null = receptionist/admin',
+  role                 ENUM('admin','receptionist','doctor') NOT NULL DEFAULT 'receptionist',
+  is_active            TINYINT(1)   NOT NULL DEFAULT 1,
+  must_change_password TINYINT(1)   NOT NULL DEFAULT 0  COMMENT 'forces a /api/auth/change-password before any other action',
+  created_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT pk_staff_users    PRIMARY KEY (id),
   CONSTRAINT uq_staff_username UNIQUE (username),
   CONSTRAINT fk_staff_provider FOREIGN KEY (provider_id)

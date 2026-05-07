@@ -24,7 +24,40 @@ final class TestSeed
         $pdo->exec('TRUNCATE TABLE provider_schedules');
         $pdo->exec('TRUNCATE TABLE appointment_types');
         $pdo->exec('TRUNCATE TABLE providers');
+        $pdo->exec('TRUNCATE TABLE staff_users');
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+    }
+
+    /**
+     * Insert a staff user directly — useful for auth/authorization tests.
+     * Password is stored as bcrypt hash of $plainPassword.
+     */
+    public static function staffUser(
+        PDO $pdo,
+        string $username = 'testadmin',
+        string $plainPassword = 'password123',
+        string $role = 'admin',
+        ?string $providerId = null,
+        int $mustChangePassword = 0,
+    ): string {
+        $id   = Uuid::uuid4()->toString();
+        $hash = password_hash($plainPassword, PASSWORD_BCRYPT, ['cost' => 10]);
+        $stmt = $pdo->prepare(
+            'INSERT INTO staff_users
+                   (id, username, name, password, provider_id, role,
+                    is_active, must_change_password)
+                  VALUES (:id, :u, :n, :p, :pid, :r, 1, :mcp)'
+        );
+        $stmt->execute([
+            'id'  => $id,
+            'u'   => $username,
+            'n'   => ucfirst($role) . ' User',
+            'p'   => $hash,
+            'pid' => $providerId,
+            'r'   => $role,
+            'mcp' => $mustChangePassword,
+        ]);
+        return $id;
     }
 
     public static function provider(

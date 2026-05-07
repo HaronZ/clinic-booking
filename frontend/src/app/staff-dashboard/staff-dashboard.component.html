@@ -9,6 +9,11 @@
       <div class="topbar__user">
         <span class="topbar__name">{{ s.name }}</span>
         <span class="badge badge--role">{{ s.role }}</span>
+        @if (s.role === 'admin') {
+          <button class="btn-logout" style="background:rgba(255,255,255,.35)" (click)="navigateToAdmin()">
+            ⚙ Manage clinic
+          </button>
+        }
         <button class="btn-logout" (click)="logout()">Sign out</button>
       </div>
     }

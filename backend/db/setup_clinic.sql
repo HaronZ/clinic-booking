@@ -1,4 +1,12 @@
 -- ─────────────────────────────────────────────────────────────────────────────
+-- DEPRECATED — use the Admin Panel instead.
+--
+-- As of the admin panel release, you no longer need to edit SQL to configure
+-- your clinic. After running `php scripts/migrate.php`, log in as admin and
+-- use the Providers / Appointment Types / Schedules / Staff tabs.
+--
+-- This file is kept for advanced users who prefer bulk SQL setup.
+-- ─────────────────────────────────────────────────────────────────────────────
 -- setup_clinic.sql  —  Fill in YOUR clinic's data, then run this file.
 --
 -- HOW TO USE:

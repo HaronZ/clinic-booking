@@ -85,9 +85,20 @@ function runSqlFile(PDO $pdo, string $file, string $label): void
             $pdo->exec($stmt);
             $count++;
         } catch (PDOException $e) {
-            // 1061 = duplicate key name (index already exists) — safe to ignore
-            if (str_contains($e->getMessage(), '1061')) continue;
-            fwrite(STDERR, "WARNING: " . $e->getMessage() . "\n");
+            $msg = $e->getMessage();
+            // Ignore "already exists" errors so re-runs and the legacy
+            // 001-005 migrations stay quiet after schema.sql:
+            //   1050 = table already exists
+            //   1060 = duplicate column name
+            //   1061 = duplicate key name (index already exists)
+            if (
+                str_contains($msg, '1050')
+                || str_contains($msg, '1060')
+                || str_contains($msg, '1061')
+            ) {
+                continue;
+            }
+            fwrite(STDERR, "WARNING: " . $msg . "\n");
             fwrite(STDERR, "Statement: " . substr($stmt, 0, 120) . "\n\n");
         }
     }
@@ -97,6 +108,16 @@ function runSqlFile(PDO $pdo, string $file, string $label): void
 
 // ── Run schema (tables only — always) ────────────────────────────────────────
 runSqlFile($pdo, $root . '/db/schema.sql', 'schema.sql (table structure)');
+
+// ── Run any incremental migrations (for upgrades on already-installed dbs) ───
+$migrationsDir = $root . '/db/migrations';
+if (is_dir($migrationsDir)) {
+    $files = glob($migrationsDir . '/*.sql') ?: [];
+    sort($files); // 001_*, 002_*, ... in order
+    foreach ($files as $file) {
+        runSqlFile($pdo, $file, 'migration ' . basename($file));
+    }
+}
 
 // ── Run demo seed (optional) ──────────────────────────────────────────────────
 if ($withDemo) {

@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Observable, map, throwError, catchError, tap } from 'rxjs';
 
 import { LoginResponse, StaffInfo } from '../models/staff.model';
@@ -53,6 +53,45 @@ export class AuthService {
           }));
         }),
       );
+  }
+
+  /**
+   * Exchange current + new password. On success updates the stored token so
+   * the frontend immediately reflects must_change_password = false.
+   */
+  changePassword(currentPassword: string, newPassword: string): Observable<StaffInfo> {
+    const token   = this._token();
+    const headers = new HttpHeaders(
+      token ? { Authorization: `Bearer ${token}` } : {},
+    );
+
+    return this.http
+      .post<SuccessEnvelope<LoginResponse>>(
+        '/api/auth/change-password',
+        { current_password: currentPassword, new_password: newPassword },
+        { headers },
+      )
+      .pipe(
+        map((env) => env.data),
+        tap((res) => this.refreshToken(res.token, res.staff)),
+        map((res) => res.staff),
+        catchError((err: HttpErrorResponse) => {
+          const body = err.error as ErrorEnvelope | null;
+          return throwError(() => ({
+            status: err.status,
+            code:    body?.error?.code    ?? 'NETWORK_ERROR',
+            message: body?.error?.message ?? err.message,
+          }));
+        }),
+      );
+  }
+
+  /** Swap stored token + staff (e.g. after password change). */
+  refreshToken(token: string, staff: StaffInfo): void {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(STAFF_KEY, JSON.stringify(staff));
+    this._token.set(token);
+    this._staff.set(staff);
   }
 
   logout(): void {

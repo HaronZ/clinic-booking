@@ -35,13 +35,16 @@ final class AuthService
             throw new ValidationException('INVALID_CREDENTIALS', 'Invalid username or password');
         }
 
-        $now     = time();
+        $now                = time();
+        $mustChangePassword = (bool) ($user['must_change_password'] ?? 0);
+
         $payload = [
-            'iat'         => $now,
-            'exp'         => $now + $this->ttl,
-            'sub'         => $user['id'],
-            'role'        => $user['role'],
-            'provider_id' => $user['provider_id'], // null for admin/receptionist
+            'iat'                  => $now,
+            'exp'                  => $now + $this->ttl,
+            'sub'                  => $user['id'],
+            'role'                 => $user['role'],
+            'provider_id'          => $user['provider_id'], // null for admin/receptionist
+            'must_change_password' => $mustChangePassword,
         ];
 
         $token = JWT::encode($payload, $this->secret, 'HS256');
@@ -49,10 +52,11 @@ final class AuthService
         return [
             'token' => $token,
             'staff' => [
-                'id'          => $user['id'],
-                'name'        => $user['name'],
-                'role'        => $user['role'],
-                'provider_id' => $user['provider_id'],
+                'id'                   => $user['id'],
+                'name'                 => $user['name'],
+                'role'                 => $user['role'],
+                'provider_id'          => $user['provider_id'],
+                'must_change_password' => $mustChangePassword,
             ],
         ];
     }
@@ -74,6 +78,47 @@ final class AuthService
         } catch (\Throwable) {
             throw new ValidationException('UNAUTHORIZED', 'Invalid or expired token');
         }
+    }
+
+    /**
+     * Re-issue a fresh JWT for an already-authenticated user.
+     * Called after a password change so the frontend can swap its stored token
+     * and immediately see must_change_password = false.
+     *
+     * @return array{token:string,staff:array<string,mixed>}
+     * @throws ValidationException if the account no longer exists or is inactive.
+     */
+    public function issueTokenForUser(string $userId): array
+    {
+        $user = $this->staff->findById($userId); // active-only by default
+        if ($user === null) {
+            throw new ValidationException('STAFF_NOT_FOUND', 'Account no longer exists');
+        }
+
+        $now                = time();
+        $mustChangePassword = (bool) ($user['must_change_password'] ?? 0);
+
+        $payload = [
+            'iat'                  => $now,
+            'exp'                  => $now + $this->ttl,
+            'sub'                  => $user['id'],
+            'role'                 => $user['role'],
+            'provider_id'          => $user['provider_id'],
+            'must_change_password' => $mustChangePassword,
+        ];
+
+        $token = JWT::encode($payload, $this->secret, 'HS256');
+
+        return [
+            'token' => $token,
+            'staff' => [
+                'id'                   => $user['id'],
+                'name'                 => $user['name'],
+                'role'                 => $user['role'],
+                'provider_id'          => $user['provider_id'],
+                'must_change_password' => $mustChangePassword,
+            ],
+        ];
     }
 
     /**
