@@ -56,6 +56,7 @@ type Role = typeof ROLES[number];
     .empty-card p { margin:0 0 1rem; font-size:.9rem; }
     .check-row { display:flex; align-items:center; gap:.5rem; font-size:.85rem; color:#374151; cursor:pointer; }
     .provider-name { font-size:.8rem; color:#6b7280; }
+    .role-hint { margin:.25rem 0 0; font-size:.77rem; color:#6b7280; line-height:1.4; min-height:1.1rem; }
   `],
   template: `
     <div class="sh">
@@ -100,7 +101,7 @@ type Role = typeof ROLES[number];
               <tr>
                 <td><strong>{{ s.username }}</strong></td>
                 <td>{{ s.name }}</td>
-                <td><span class="badge-role">{{ s.role }}</span></td>
+                <td><span class="badge-role">{{ roleLabel(s.role) }}</span></td>
                 <td>
                   @if (s.provider_id) {
                     <span class="provider-name">{{ providerName(s.provider_id) }}</span>
@@ -113,7 +114,9 @@ type Role = typeof ROLES[number];
                 <td>
                   <button class="btn btn-gray" (click)="openEdit(s)">Edit</button>
                   @if (+s.is_active) {
-                    <button class="btn btn-red" (click)="deactivate(s)">Deactivate</button>
+                    <button class="btn btn-red"
+                      title="Removes login access. The account and all history are preserved and can be reactivated."
+                      (click)="deactivate(s)">Deactivate</button>
                   }
                 </td>
               </tr>
@@ -150,8 +153,15 @@ type Role = typeof ROLES[number];
               <div class="field">
                 <label for="staff-role">Role *</label>
                 <select id="staff-role" formControlName="role">
-                  @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
+                  <option value="admin">Admin</option>
+                  <option value="receptionist">Receptionist</option>
+                  <option value="doctor">Doctor</option>
                 </select>
+                <p class="role-hint">
+                  @if (form.controls.role.value === 'admin')        { Full access — can manage all clinic settings, providers, and staff. }
+                  @if (form.controls.role.value === 'receptionist') { Can view and manage all appointments on the staff dashboard. }
+                  @if (form.controls.role.value === 'doctor')       { Can view their own schedule and today's appointments. }
+                </p>
               </div>
               @if (form.controls.role.value === 'doctor') {
                 <div class="field">
@@ -239,6 +249,11 @@ export class StaffSectionComponent implements OnInit {
   }
 
   toggleInactive(): void { this.showInactive.update((v) => !v); this.load(); }
+
+  roleLabel(role: string): string {
+    const map: Record<string, string> = { admin: 'Admin', receptionist: 'Receptionist', doctor: 'Doctor' };
+    return map[role] ?? role;
+  }
 
   providerName(id: string): string {
     return this.providers().find((p) => p.id === id)?.name ?? id;

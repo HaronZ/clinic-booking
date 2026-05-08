@@ -44,6 +44,24 @@ type Tab = 'providers' | 'types' | 'schedules' | 'staff';
     /* ── Dashboard link ── */
     .back-link { display:inline-block; margin:.75rem 1.5rem 0; font-size:.83rem; color:#6b7280; text-decoration:none; cursor:pointer; background:none; border:none; font:inherit; padding:0; }
     .back-link:hover { color:#374151; text-decoration:underline; }
+
+    /* ── Setup checklist banner ── */
+    .setup-banner { margin:1rem 1.5rem 0; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:.875rem 1.125rem; }
+    .setup-banner__top { display:flex; justify-content:space-between; align-items:center; margin-bottom:.625rem; }
+    .setup-banner__title { margin:0; font-size:.875rem; font-weight:700; color:#1e40af; }
+    .setup-steps { display:flex; flex-wrap:wrap; align-items:center; gap:.375rem; }
+    .setup-step { display:flex; align-items:center; gap:.35rem; padding:.3rem .75rem; border-radius:20px; font-size:.8rem; font-weight:600; border:1px solid #93c5fd; background:#fff; color:#1d4ed8; cursor:pointer; transition:background .12s; white-space:nowrap; }
+    .setup-step:hover { background:#dbeafe; }
+    .setup-step.visited { background:#d1fae5; border-color:#6ee7b7; color:#065f46; cursor:default; }
+    .step-num { display:inline-flex; align-items:center; justify-content:center; width:1rem; height:1rem; background:#1d4ed8; color:#fff; border-radius:50%; font-size:.62rem; font-weight:700; flex-shrink:0; }
+    .setup-step.visited .step-num { background:#059669; }
+    .step-arrow { color:#9ca3af; font-size:.8rem; user-select:none; }
+    .btn-dismiss-setup { background:none; border:none; color:#93c5fd; font-size:.78rem; cursor:pointer; padding:.2rem .5rem; border-radius:3px; font-weight:600; }
+    .btn-dismiss-setup:hover { background:#dbeafe; color:#1e40af; }
+
+    /* ── Tab description subtitle ── */
+    .tab-desc { padding:.4rem 1.5rem; background:#fff; border-bottom:1px solid #e5e7eb; }
+    .tab-desc p { margin:0; font-size:.82rem; color:#6b7280; }
   `],
   template: `
     <!-- Top bar -->
@@ -64,11 +82,46 @@ type Tab = 'providers' | 'types' | 'schedules' | 'staff';
 
     <!-- Tab navigation -->
     <nav class="tabs">
-      <button class="tab-btn" [class.active]="tab()==='providers'"  (click)="tab.set('providers')">Providers</button>
-      <button class="tab-btn" [class.active]="tab()==='types'"      (click)="tab.set('types')">Appointment Types</button>
-      <button class="tab-btn" [class.active]="tab()==='schedules'"  (click)="tab.set('schedules')">Schedules</button>
-      <button class="tab-btn" [class.active]="tab()==='staff'"      (click)="tab.set('staff')">Staff Accounts</button>
+      <button class="tab-btn" [class.active]="tab()==='providers'"  (click)="selectTab('providers')">Providers</button>
+      <button class="tab-btn" [class.active]="tab()==='types'"      (click)="selectTab('types')">Appointment Types</button>
+      <button class="tab-btn" [class.active]="tab()==='schedules'"  (click)="selectTab('schedules')">Schedules</button>
+      <button class="tab-btn" [class.active]="tab()==='staff'"      (click)="selectTab('staff')">Staff Accounts</button>
     </nav>
+
+    <!-- Setup checklist — shown until dismissed via localStorage -->
+    @if (!setupDismissed()) {
+      <div class="setup-banner">
+        <div class="setup-banner__top">
+          <p class="setup-banner__title">🚀 Getting started — work through each step in order</p>
+          <button class="btn-dismiss-setup" (click)="dismissSetup()" title="Dismiss this guide">Got it ✕</button>
+        </div>
+        <div class="setup-steps">
+          <button class="setup-step" [class.visited]="visited().has('providers')"  (click)="selectTab('providers')">
+            <span class="step-num">1</span> Providers @if (visited().has('providers')) { ✓ }
+          </button>
+          <span class="step-arrow">→</span>
+          <button class="setup-step" [class.visited]="visited().has('types')"      (click)="selectTab('types')">
+            <span class="step-num">2</span> Appointment Types @if (visited().has('types')) { ✓ }
+          </button>
+          <span class="step-arrow">→</span>
+          <button class="setup-step" [class.visited]="visited().has('schedules')"  (click)="selectTab('schedules')">
+            <span class="step-num">3</span> Schedules @if (visited().has('schedules')) { ✓ }
+          </button>
+          <span class="step-arrow">→</span>
+          <button class="setup-step" [class.visited]="visited().has('staff')"      (click)="selectTab('staff')">
+            <span class="step-num">4</span> Staff Accounts @if (visited().has('staff')) { ✓ }
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Tab description subtitle -->
+    <div class="tab-desc">
+      @if (tab()==='providers')  { <p>Doctors and practitioners that patients can book appointments with</p> }
+      @if (tab()==='types')      { <p>Types of visits patients can choose from when booking</p> }
+      @if (tab()==='schedules')  { <p>Working hours for each provider — sets when they're available for bookings</p> }
+      @if (tab()==='staff')      { <p>Login accounts for your clinic's receptionists and doctors</p> }
+    </div>
 
     <!-- Active section. Each section emits (unauthorized) on a 401 so the
          shell can log the user out cleanly instead of leaving them stuck on
@@ -82,11 +135,32 @@ type Tab = 'providers' | 'types' | 'schedules' | 'staff';
 export class AdminPanelComponent {
   private readonly auth = inject(AuthService);
 
-  @Output() loggedOut   = new EventEmitter<void>();
+  @Output() loggedOut    = new EventEmitter<void>();
   @Output() goDashboard_ = new EventEmitter<void>();
 
   readonly staff = this.auth.staff;
   readonly tab   = signal<Tab>('providers');
+
+  /** Which tabs have been explicitly clicked — drives the setup checklist. */
+  readonly visited = signal<Set<Tab>>(new Set<Tab>());
+
+  /** True once the user has dismissed the checklist (persisted in localStorage). */
+  readonly setupDismissed = signal(
+    typeof localStorage !== 'undefined' && localStorage.getItem('clinic_setup_done') === '1',
+  );
+
+  /** Switch tab and mark it visited in the setup checklist. */
+  selectTab(t: Tab): void {
+    this.tab.set(t);
+    this.visited.update(v => { v.add(t); return new Set(v); });
+  }
+
+  dismissSetup(): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('clinic_setup_done', '1');
+    }
+    this.setupDismissed.set(true);
+  }
 
   goDashboard(): void { this.goDashboard_.emit(); }
 

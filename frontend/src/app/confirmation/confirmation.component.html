@@ -28,8 +28,10 @@
         </span>
       </div>
 
-      @if (b.status === 'pending' || b.status === 'confirmed') {
-        <p class="lede">Your appointment has been received. Please arrive <strong>10 minutes early</strong>.</p>
+      @if (b.status === 'pending') {
+        <p class="lede">Your request has been received. The clinic will review it and contact you to confirm.</p>
+      } @else if (b.status === 'confirmed') {
+        <p class="lede">Your appointment is confirmed. Please arrive <strong>10 minutes early</strong>.</p>
       } @else if (b.status === 'cancelled') {
         <p class="lede cancelled-msg">This appointment has been cancelled.</p>
       } @else if (b.status === 'completed') {

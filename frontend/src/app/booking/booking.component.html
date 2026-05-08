@@ -78,6 +78,7 @@
             <button type="button" class="link-btn" (click)="tryNextDay()">→ Try the next day</button>
           </div>
         } @else {
+          <p class="hint">Each appointment is <strong>{{ selectedTypeDuration() }} min</strong>. Select an available time below.</p>
           <div class="slots">
             @for (slot of slots(); track slot.start_time) {
               <button
@@ -92,10 +93,6 @@
               </button>
             }
           </div>
-
-          @if (!slotForm.value.start_time && slots().length > 0) {
-            <p class="hint">Select an available time to continue.</p>
-          }
         }
       }
 

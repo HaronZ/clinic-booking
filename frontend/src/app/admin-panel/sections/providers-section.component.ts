@@ -108,7 +108,9 @@ import { ToastService } from '../../services/toast.service';
                 <td>
                   <button class="btn btn-gray" (click)="openEdit(p)">Edit</button>
                   @if (+p.is_active) {
-                    <button class="btn btn-red" (click)="deactivate(p)">Deactivate</button>
+                    <button class="btn btn-red"
+                      title="Hides from new bookings. All existing appointments are preserved."
+                      (click)="deactivate(p)">Deactivate</button>
                   } @else {
                     <button class="btn btn-green" (click)="restore(p)">Restore</button>
                   }
