@@ -91,6 +91,7 @@ The double-booking guard lives in `BookingService::create()` — a `SELECT … F
 | Staff schedule dashboard | ✅ |
 | Confirm / Complete / Cancel from dashboard | ✅ |
 | **Admin panel — manage providers, types, schedules, staff** | ✅ |
+| **Guided setup checklist** (dismissible, localStorage-persisted) | ✅ |
 | **Forced first-login password change** | ✅ |
 | Email confirmations (PHPMailer, SMTP) | ✅ |
 | Mobile-responsive CSS | ✅ |
@@ -103,7 +104,7 @@ The double-booking guard lives in `BookingService::create()` — a `SELECT … F
 ```
 backend/
   db/
-    migrations/       001–006 SQL migrations (run automatically)
+    migrations/       001–007 SQL migrations (run automatically)
     schema.sql        Table definitions
     seed_demo.sql     Demo data (2 doctors, 3 types, 4 staff)
     setup_clinic.sql  Deprecated SQL template (see admin panel instead)
