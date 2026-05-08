@@ -27,6 +27,7 @@ import { ToastService } from '../../services/toast.service';
     .badge-on  { background:#d1fae5; color:#065f46; padding:.15rem .5rem; border-radius:999px; font-size:.75rem; font-weight:700; }
     .badge-off { background:#fee2e2; color:#991b1b; padding:.15rem .5rem; border-radius:999px; font-size:.75rem; font-weight:700; }
     .muted { color:#9ca3af; font-size:.8rem; }
+    .slug-hint { font-size:.72rem; color:#9ca3af; margin-top:.1rem; font-family:monospace; letter-spacing:.01em; }
     .btn { padding:.28rem .65rem; font:inherit; font-size:.82rem; border-radius:4px; cursor:pointer; border:1px solid transparent; margin-right:.25rem; font-weight:600; }
     .btn:disabled { opacity:.5; cursor:not-allowed; }
     .btn-blue  { background:#2563eb; color:#fff; border-color:#2563eb; }
@@ -90,14 +91,16 @@ import { ToastService } from '../../services/toast.service';
       <div class="tw">
         <table>
           <thead><tr>
-            <th>Name</th><th>Specialty</th><th>Slug</th><th>Status</th><th>Actions</th>
+            <th>Name</th><th>Specialty</th><th>Status</th><th>Actions</th>
           </tr></thead>
           <tbody>
             @for (p of providers(); track p.id) {
               <tr>
-                <td><strong>{{ p.name }}</strong></td>
+                <td>
+                  <strong>{{ p.name }}</strong>
+                  <div class="slug-hint">{{ p.slug }}</div>
+                </td>
                 <td>{{ p.specialty }}</td>
-                <td><span class="muted">{{ p.slug }}</span></td>
                 <td>
                   @if (+p.is_active) { <span class="badge-on">Active</span> }
                   @else              { <span class="badge-off">Inactive</span> }
@@ -133,10 +136,6 @@ import { ToastService } from '../../services/toast.service';
                 <label for="prov-spec">Specialty *</label>
                 <input id="prov-spec" formControlName="specialty" placeholder="General Medicine" />
               </div>
-              <div class="field">
-                <label for="prov-slug">Slug <small>(optional — auto-generated if blank)</small></label>
-                <input id="prov-slug" formControlName="slug" placeholder="dr-maria-santos" />
-              </div>
               <div class="modal-actions">
                 <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
                 <button type="submit" class="btn btn-blue" [disabled]="saving() || form.invalid">
@@ -171,7 +170,6 @@ export class ProvidersSectionComponent implements OnInit {
   readonly form = this.fb.nonNullable.group({
     name:      ['', [Validators.required]],
     specialty: ['', [Validators.required]],
-    slug:      [''],
   });
 
   @HostListener('document:keydown.escape')
@@ -201,7 +199,7 @@ export class ProvidersSectionComponent implements OnInit {
 
   openEdit(p: AdminProvider): void {
     this.editing.set(p);
-    this.form.reset({ name: p.name, specialty: p.specialty, slug: p.slug });
+    this.form.reset({ name: p.name, specialty: p.specialty });
     this.formErr.set(null);
     this.showModal.set(true);
   }
@@ -222,14 +220,13 @@ export class ProvidersSectionComponent implements OnInit {
       return;
     }
 
-    const { name, specialty, slug } = this.form.getRawValue();
+    const { name, specialty } = this.form.getRawValue();
     this.saving.set(true);
     this.formErr.set(null);
 
     const body = {
       name:      name.trim(),
       specialty: specialty.trim(),
-      ...(slug.trim() ? { slug: slug.trim() } : {}),
     };
     const p     = this.editing();
     const isNew = !p;
@@ -269,7 +266,7 @@ export class ProvidersSectionComponent implements OnInit {
   }
 
   private resetForm(): void {
-    this.form.reset({ name: '', specialty: '', slug: '' });
+    this.form.reset({ name: '', specialty: '' });
     this.formErr.set(null);
   }
 

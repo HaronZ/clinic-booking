@@ -27,6 +27,7 @@ import { ToastService } from '../../services/toast.service';
     .badge-on  { background:#d1fae5; color:#065f46; padding:.15rem .5rem; border-radius:999px; font-size:.75rem; font-weight:700; }
     .badge-off { background:#fee2e2; color:#991b1b; padding:.15rem .5rem; border-radius:999px; font-size:.75rem; font-weight:700; }
     .muted { color:#9ca3af; font-size:.8rem; }
+    .slug-hint { font-size:.72rem; color:#9ca3af; margin-top:.1rem; font-family:monospace; letter-spacing:.01em; }
     .btn { padding:.28rem .65rem; font:inherit; font-size:.82rem; border-radius:4px; cursor:pointer; border:1px solid transparent; margin-right:.25rem; font-weight:600; }
     .btn:disabled { opacity:.5; cursor:not-allowed; }
     .btn-blue { background:#2563eb; color:#fff; border-color:#2563eb; }
@@ -88,14 +89,16 @@ import { ToastService } from '../../services/toast.service';
       <div class="tw">
         <table>
           <thead><tr>
-            <th>Name</th><th>Duration</th><th>Slug</th><th>Status</th><th>Actions</th>
+            <th>Name</th><th>Duration</th><th>Status</th><th>Actions</th>
           </tr></thead>
           <tbody>
             @for (t of types(); track t.id) {
               <tr>
-                <td><strong>{{ t.name }}</strong></td>
+                <td>
+                  <strong>{{ t.name }}</strong>
+                  <div class="slug-hint">{{ t.slug }}</div>
+                </td>
                 <td>{{ t.duration_minutes }} min</td>
-                <td><span class="muted">{{ t.slug }}</span></td>
                 <td>
                   @if (+t.is_active) { <span class="badge-on">Active</span> }
                   @else              { <span class="badge-off">Inactive</span> }
@@ -127,10 +130,6 @@ import { ToastService } from '../../services/toast.service';
               <div class="field">
                 <label for="type-dur">Duration (minutes) * <small>1–480</small></label>
                 <input id="type-dur" type="number" formControlName="duration_minutes" min="1" max="480" placeholder="30" />
-              </div>
-              <div class="field">
-                <label for="type-slug">Slug <small>(optional)</small></label>
-                <input id="type-slug" formControlName="slug" placeholder="general-consultation" />
               </div>
               <div class="modal-actions">
                 <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
@@ -167,7 +166,6 @@ export class TypesSectionComponent implements OnInit {
   readonly form = this.fb.nonNullable.group({
     name:             ['', [Validators.required]],
     duration_minutes: [null as number | null, [Validators.required, Validators.min(1), Validators.max(480)]],
-    slug:             [''],
   });
 
   @HostListener('document:keydown.escape')
@@ -194,7 +192,7 @@ export class TypesSectionComponent implements OnInit {
 
   openEdit(t: AdminAppointmentType): void {
     this.editing.set(t);
-    this.form.reset({ name: t.name, duration_minutes: t.duration_minutes, slug: t.slug });
+    this.form.reset({ name: t.name, duration_minutes: t.duration_minutes });
     this.formErr.set(null);
     this.showModal.set(true);
   }
@@ -218,14 +216,13 @@ export class TypesSectionComponent implements OnInit {
     }
     if (this.form.invalid) return;
 
-    const { name, duration_minutes, slug } = this.form.getRawValue();
+    const { name, duration_minutes } = this.form.getRawValue();
     this.saving.set(true);
     this.formErr.set(null);
 
     const body = {
       name: name.trim(),
       duration_minutes: Number(duration_minutes),
-      ...(slug.trim() ? { slug: slug.trim() } : {}),
     };
     const t     = this.editing();
     const isNew = !t;
@@ -255,7 +252,7 @@ export class TypesSectionComponent implements OnInit {
   }
 
   private resetForm(): void {
-    this.form.reset({ name: '', duration_minutes: null, slug: '' });
+    this.form.reset({ name: '', duration_minutes: null });
     this.formErr.set(null);
   }
 
