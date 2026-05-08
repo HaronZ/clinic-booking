@@ -19,7 +19,7 @@
     }
   </header>
 
-  <!-- Date picker -->
+  <!-- Date picker + refresh -->
   <div class="controls">
     <label for="scheduleDate">Schedule for</label>
     <input
@@ -29,13 +29,68 @@
       (change)="onDateChange($any($event.target).value)"
     />
     <button class="btn-refresh" (click)="loadSchedule()" [disabled]="loading()">
-      Refresh
+      ↻ Refresh
     </button>
+    <span class="auto-hint" title="Auto-refreshes every 30 seconds">
+      ↻ Auto • last updated {{ lastRefresh() | date:'HH:mm:ss' }}
+    </span>
+
+    <div class="search-wrap">
+      <span class="search-icon">🔎</span>
+      <input
+        id="searchInput"
+        type="search"
+        class="search-input"
+        placeholder="Search patient, phone, type… (press /)"
+        [formControl]="searchCtrl"
+        autocomplete="off"
+      />
+      @if (searchQuery()) {
+        <button type="button" class="search-clear" (click)="clearSearch()" aria-label="Clear search">×</button>
+      }
+    </div>
   </div>
+
+  <!-- Stats cards -->
+  @if (!loading() && schedule()) {
+    <div class="stats-row">
+      <button class="stat-card" [class.active]="statusFilter()==='all'" (click)="setStatusFilter('all')">
+        <span class="stat-num">{{ stats().total }}</span>
+        <span class="stat-label">Total</span>
+      </button>
+      <button class="stat-card stat--pending" [class.active]="statusFilter()==='pending'" (click)="setStatusFilter('pending')">
+        <span class="stat-num">{{ stats().pending }}</span>
+        <span class="stat-label">⏳ Pending</span>
+      </button>
+      <button class="stat-card stat--confirmed" [class.active]="statusFilter()==='confirmed'" (click)="setStatusFilter('confirmed')">
+        <span class="stat-num">{{ stats().confirmed }}</span>
+        <span class="stat-label">✓ Confirmed</span>
+      </button>
+      <button class="stat-card stat--completed" [class.active]="statusFilter()==='completed'" (click)="setStatusFilter('completed')">
+        <span class="stat-num">{{ stats().completed }}</span>
+        <span class="stat-label">✔ Completed</span>
+      </button>
+      <button class="stat-card stat--cancelled" [class.active]="statusFilter()==='cancelled'" (click)="setStatusFilter('cancelled')">
+        <span class="stat-num">{{ stats().cancelled }}</span>
+        <span class="stat-label">✕ Cancelled</span>
+      </button>
+    </div>
+  }
 
   <!-- Body -->
   @if (loading()) {
-    <div class="state-msg">Loading schedule…</div>
+    <div class="table-wrap">
+      <div class="skeleton-table" aria-label="Loading schedule">
+        @for (i of [1,2,3,4,5]; track i) {
+          <div class="skel-row">
+            <div class="skel-bar skel-bar--time"></div>
+            <div class="skel-bar skel-bar--name"></div>
+            <div class="skel-bar skel-bar--type"></div>
+            <div class="skel-bar skel-bar--badge"></div>
+          </div>
+        }
+      </div>
+    </div>
   }
 
   @if (error()) {
@@ -44,7 +99,22 @@
 
   @if (!loading() && !error() && schedule(); as s) {
     @if (s.appointments.length === 0) {
-      <div class="state-msg empty">No appointments scheduled for {{ s.date }}.</div>
+      <div class="empty-state">
+        <div class="empty-icon">📅</div>
+        <h3>No appointments scheduled</h3>
+        <p>Nothing booked for {{ s.date }}. Try a different date or wait for new bookings to come in.</p>
+      </div>
+    } @else if (filteredAppointments().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>No matches</h3>
+        <p>
+          No appointments
+          @if (statusFilter() !== 'all') { with status <strong>{{ statusFilter() }}</strong> }
+          @if (searchQuery()) { matching <strong>"{{ searchQuery() }}"</strong> }.
+        </p>
+        <button class="btn-clear-filters" (click)="setStatusFilter('all'); clearSearch()">Clear filters</button>
+      </div>
     } @else {
       <div class="table-wrap">
         <table class="schedule-table">
@@ -59,7 +129,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (appt of s.appointments; track appt.id) {
+            @for (appt of filteredAppointments(); track appt.id) {
               <tr [class.row--cancelled]="appt.status === 'cancelled'"
                   [class.row--completed]="appt.status === 'completed'">
                 <td class="time-cell">
@@ -104,6 +174,9 @@
             }
           </tbody>
         </table>
+        <div class="kbd-hint">
+          Tip: press <kbd>/</kbd> to search, <kbd>r</kbd> to refresh, <kbd>1</kbd>–<kbd>4</kbd> to filter status.
+        </div>
       </div>
     }
   }

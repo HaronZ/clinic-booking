@@ -4,6 +4,7 @@ import {
   EventEmitter,
   OnInit,
   Output,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -52,7 +53,36 @@ export class BookingComponent implements OnInit {
   readonly submitting = signal(false);
   readonly submitError = signal<string | null>(null);
 
-  readonly today = new Date().toISOString().slice(0, 10);
+  // Use *local* date, not UTC — `toISOString()` shifts to UTC, which can land
+  // on yesterday for users east of GMT (e.g. PH at 1 AM is still UTC yesterday).
+  readonly today   = this.formatLocalDate(new Date());
+  readonly maxDate = this.formatLocalDate(this.addDays(new Date(), 90));
+
+  /** True when slots loaded but every slot is taken — used for the empty-state copy. */
+  readonly allSlotsTaken = computed(() => {
+    const list = this.slots();
+    return list.length > 0 && list.every((s) => !s.available);
+  });
+
+  private formatLocalDate(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  private addDays(d: Date, n: number): Date {
+    const out = new Date(d);
+    out.setDate(out.getDate() + n);
+    return out;
+  }
+
+  /** Jump the date picker forward one day and refetch slots. */
+  tryNextDay(): void {
+    const cur = this.typeDateForm.value.date as string;
+    if (!cur) return;
+    const next = this.formatLocalDate(this.addDays(new Date(cur), 1));
+    if (next > this.maxDate) return;
+    this.typeDateForm.patchValue({ date: next });
+    this.fetchSlots();
+  }
 
   /** Step 1: provider. */
   readonly providerForm: FormGroup = this.fb.group({

@@ -48,6 +48,10 @@ import { ToastService } from '../../services/toast.service';
     .modal-actions { display:flex; justify-content:flex-end; gap:.5rem; margin-top:1.2rem; }
     .alert-err { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:.6rem .9rem; border-radius:6px; margin-bottom:.9rem; font-size:.875rem; }
     .empty-msg { text-align:center; padding:3rem; color:#9ca3af; }
+    .empty-card { text-align:center; padding:3rem 1.5rem; background:#fff; border:1px dashed #d1d5db; border-radius:8px; color:#6b7280; }
+    .empty-card .empty-icon { font-size:2.5rem; margin-bottom:.5rem; }
+    .empty-card h3 { margin:0 0 .25rem; font-size:1.05rem; color:#374151; }
+    .empty-card p { margin:0 0 1rem; font-size:.9rem; }
     .check-row { display:flex; align-items:center; gap:.5rem; font-size:.85rem; color:#374151; margin-bottom:1rem; cursor:pointer; }
   `],
   template: `
@@ -67,9 +71,18 @@ import { ToastService } from '../../services/toast.service';
 
     @if (!loading() && providers().length === 0 && !listErr()) {
       @if (showInactive()) {
-        <div class="empty-msg">No providers in the system yet. Add one to get started.</div>
+        <div class="empty-card">
+          <div class="empty-icon">👨‍⚕️</div>
+          <h3>No providers yet</h3>
+          <p>Add your first doctor or practitioner to start accepting bookings.</p>
+          <button class="btn btn-blue" (click)="openCreate()">+ Add your first provider</button>
+        </div>
       } @else {
-        <div class="empty-msg">No active providers. Toggle <strong>Show inactive</strong> to see soft-deleted ones.</div>
+        <div class="empty-card">
+          <div class="empty-icon">🚫</div>
+          <h3>No active providers</h3>
+          <p>All providers are deactivated. Toggle <strong>Show inactive</strong> above to view or restore them.</p>
+        </div>
       }
     }
 

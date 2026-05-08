@@ -53,7 +53,7 @@ type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard' | 'ad
 
     <!-- Tiny nav link for staff -->
     @if (view() === 'booking' || view() === 'confirmation') {
-      <nav class="staff-nav">
+      <nav class="staff-nav no-print">
         <a href="#" (click)="goToStaff($event)">Staff login</a>
       </nav>
     }

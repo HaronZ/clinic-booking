@@ -50,8 +50,19 @@
         <dd>{{ b.start_time | slice:0:10 }} · {{ b.start_time | slice:11:16 }} – {{ b.end_time | slice:11:16 }}</dd>
       </dl>
 
+      @if (b.status !== 'cancelled') {
+        <div class="action-row no-print">
+          <button class="btn-action" (click)="downloadIcs()" title="Download .ics file — opens in any calendar app">
+            📅 Add to calendar
+          </button>
+          <button class="btn-action" (click)="print()" title="Print or save as PDF">
+            🖨️ Print / Save
+          </button>
+        </div>
+      }
+
       @if (canCancel) {
-        <div class="cancel-zone">
+        <div class="cancel-zone no-print">
           @if (cancelError()) {
             <p class="cancel-error">{{ cancelError() }}</p>
           }

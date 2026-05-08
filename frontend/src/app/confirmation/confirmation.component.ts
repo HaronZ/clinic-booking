@@ -10,6 +10,7 @@ import { CommonModule } from '@angular/common';
 
 import { ApiService, ApiError } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
+import { ConfirmService } from '../services/confirm.service';
 import { BookingConfirmation, BookingStatus } from '../models/booking.model';
 
 @Component({
@@ -21,8 +22,9 @@ import { BookingConfirmation, BookingStatus } from '../models/booking.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ConfirmationComponent implements OnInit {
-  private readonly api  = inject(ApiService);
-  private readonly auth = inject(AuthService);
+  private readonly api     = inject(ApiService);
+  private readonly auth    = inject(AuthService);
+  private readonly confirm = inject(ConfirmService);
 
   @Input({ required: true }) bookingId!: string;
 
@@ -50,9 +52,68 @@ export class ConfirmationComponent implements OnInit {
     return s === 'pending' || s === 'confirmed';
   }
 
-  cancelBooking(): void {
+  /** Opens the OS print dialog. The print stylesheet hides nav and buttons. */
+  print(): void {
+    window.print();
+  }
+
+  /**
+   * Build a minimal RFC 5545 calendar file and trigger a browser download.
+   * Times are floating (clinic-local) — no Z suffix, no VTIMEZONE block.
+   * That's the right choice for a single-clinic, single-timezone deployment.
+   */
+  downloadIcs(): void {
+    const b = this.booking();
+    if (!b) return;
+
+    const fmt = (iso: string): string => iso.replace(/[-:]/g, '').slice(0, 15); // 20260508T140000
+    const escape = (s: string): string => s.replace(/[\\;,\n]/g, (c) => (c === '\n' ? '\\n' : '\\' + c));
+
+    const summary = `${b.appointment_type.name} with ${b.provider.name}`;
+    const description = [
+      `Provider: ${b.provider.name} (${b.provider.specialty})`,
+      `Type: ${b.appointment_type.name} (${b.appointment_type.duration_minutes} min)`,
+      `Reference: ${b.id}`,
+      'Please arrive 10 minutes early.',
+    ].join('\n');
+
+    const dtstamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Clinic Booking//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${b.id}@clinic-booking`,
+      `DTSTAMP:${dtstamp}`,
+      `DTSTART:${fmt(b.start_time)}`,
+      `DTEND:${fmt(b.end_time)}`,
+      `SUMMARY:${escape(summary)}`,
+      `DESCRIPTION:${escape(description)}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+      '',
+    ].join('\r\n');
+
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `appointment-${b.id.slice(0, 8)}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
+
+  async cancelBooking(): Promise<void> {
     if (!this.canCancel || this.cancelling()) return;
-    if (!confirm('Cancel this appointment? This cannot be undone.')) return;
+    const ok = await this.confirm.ask(
+      'Cancel this appointment? This cannot be undone.',
+      { title: 'Cancel appointment?', confirmLabel: 'Yes, cancel', danger: true },
+    );
+    if (!ok) return;
 
     this.cancelling.set(true);
     this.cancelError.set(null);

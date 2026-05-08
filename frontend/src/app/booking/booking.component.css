@@ -175,6 +175,45 @@ button.primary:hover:not(:disabled) {
   font-size: 0.9rem;
 }
 
+small.hint {
+  display: block;
+  margin-top: -0.25rem;
+}
+
+.no-slots {
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  padding: 1.25rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.no-slots p {
+  margin: 0.25rem 0;
+}
+
+.no-slots p:first-child {
+  font-size: 1rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.link-btn {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.85rem;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-btn:hover { background: #1d4ed8; }
+
 /* ---- Mobile ---- */
 @media (max-width: 640px) {
   .booking { margin: 1rem auto; }

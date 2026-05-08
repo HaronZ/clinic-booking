@@ -41,7 +41,8 @@
       </select>
 
       <label for="date">Date</label>
-      <input id="date" type="date" [min]="today" formControlName="date" />
+      <input id="date" type="date" [min]="today" [max]="maxDate" formControlName="date" />
+      <small class="hint">You can book up to 90 days in advance.</small>
 
       <div class="actions">
         <button type="button" (click)="goBack()">Back</button>
@@ -65,7 +66,17 @@
 
       @if (!slotsLoading() && !slotsError()) {
         @if (slots().length === 0) {
-          <p>No working hours configured for this date.</p>
+          <div class="no-slots">
+            <p>📅 This provider isn't working on this date.</p>
+            <p class="hint">Most clinics are closed on weekends — try a weekday.</p>
+            <button type="button" class="link-btn" (click)="tryNextDay()">→ Try the next day</button>
+          </div>
+        } @else if (allSlotsTaken()) {
+          <div class="no-slots">
+            <p>😔 This day is fully booked.</p>
+            <p class="hint">Every slot is already taken — try a different date.</p>
+            <button type="button" class="link-btn" (click)="tryNextDay()">→ Try the next day</button>
+          </div>
         } @else {
           <div class="slots">
             @for (slot of slots(); track slot.start_time) {

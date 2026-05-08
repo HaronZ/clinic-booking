@@ -85,6 +85,36 @@ code {
 .badge--completed { background: #dbeafe; color: #1e40af; }
 .badge--cancelled { background: #fee2e2; color: #991b1b; }
 
+/* ---- Action row (print / calendar) ---- */
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-action {
+  flex: 1 1 auto;
+  min-width: 9rem;
+  padding: 0.55rem 0.9rem;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-action:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
 /* ---- Cancel zone ---- */
 .cancel-zone {
   margin-top: 1.5rem;
@@ -158,4 +188,21 @@ code {
   .confirmation { margin: 1rem auto; }
   .card { padding: 1.25rem; }
   dl { grid-template-columns: 6.5rem 1fr; }
+}
+
+/* ---- Print stylesheet ---- */
+@media print {
+  /* Strip page background, browser headers, fancy shadows. */
+  :host, .confirmation { background: #fff !important; margin: 0; padding: 0; max-width: 100%; }
+  .card {
+    border: none !important;
+    padding: 0 !important;
+  }
+  /* Hide anything marked .no-print (action row, cancel button, app chrome). */
+  .no-print { display: none !important; }
+  /* Make the booking ID readable in B&W. */
+  code { background: transparent !important; padding: 0 !important; }
+  /* Keep the badge visible but remove its colored pill so it prints clean. */
+  .badge { background: transparent !important; color: #000 !important; padding: 0 !important; border: 1px solid #000; }
+  h1 { font-size: 1.6rem; }
 }
