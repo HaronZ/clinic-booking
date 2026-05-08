@@ -4,10 +4,10 @@
 
 A production-ready clinic appointment booking system. Patients book appointments online; staff manage schedules through a dashboard; admins configure the entire clinic — providers, appointment types, schedules, and staff accounts — through a built-in admin panel. No SQL required after the initial setup.
 
+[![CI](https://github.com/HaronZ/clinic-booking/actions/workflows/ci.yml/badge.svg)](https://github.com/HaronZ/clinic-booking/actions/workflows/ci.yml)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-railway.app-blueviolet)](https://clinic-booking-production.up.railway.app)
 [![PHP 8.2](https://img.shields.io/badge/PHP-8.2-blue)](https://www.php.net/)
 [![Angular 17](https://img.shields.io/badge/Angular-17-red)](https://angular.io/)
-[![Tests](https://img.shields.io/badge/tests-101%20passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -94,7 +94,7 @@ The double-booking guard lives in `BookingService::create()` — a `SELECT … F
 | **Forced first-login password change** | ✅ |
 | Email confirmations (PHPMailer, SMTP) | ✅ |
 | Mobile-responsive CSS | ✅ |
-| 101 PHPUnit tests | ✅ |
+| 109 PHPUnit tests | ✅ |
 
 ---
 
@@ -117,7 +117,7 @@ backend/
                       ScheduleManagementService, StaffManagementService
     Util/             Slug (accent-folded slug generation)
   public/index.php    Front controller (all routes)
-  tests/              101 PHPUnit unit tests
+  tests/              109 PHPUnit unit tests
   scripts/migrate.php Migration runner (tables + optional demo data)
 
 frontend/
@@ -255,7 +255,7 @@ cd backend
 php vendor/phpunit/phpunit/phpunit --testdox
 ```
 
-Expected: **101 tests, 201+ assertions** — all green.
+Expected: **109 tests, 213+ assertions** — all green. Every push to `main` runs the same suite in [GitHub Actions](https://github.com/HaronZ/clinic-booking/actions/workflows/ci.yml) against a real MySQL 8 service.
 
 ---
 
@@ -356,7 +356,7 @@ You ran `php backend/scripts/migrate.php` without `--demo`, so the database has 
 - Stay logged in as `admin` and configure providers / types / schedules / staff via the four admin tabs (the panel is designed for exactly this).
 
 **`Column not found: 'must_change_password'` after deploying to Railway**
-Migration 006 didn't apply. Trigger a redeploy after pulling the latest `master` (the migration runner now strips leading `--` comments correctly). Or run the migration manually:
+Migration 006 didn't apply. Trigger a redeploy after pulling the latest `main` (the migration runner now strips leading `--` comments correctly). Or run the migration manually:
 ```sql
 ALTER TABLE staff_users
   ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0
