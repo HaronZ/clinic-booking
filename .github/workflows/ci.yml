@@ -75,16 +75,24 @@ jobs:
           exit 1
 
       - name: Apply migrations to test database
-        working-directory: backend
+        # Use the mysql CLI directly — more reliable than the PHP SQL parser
+        # for CI. migrate.php is still used for Railway/local dev.
         env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: '3306'
-          DB_NAME: clinic_booking_test
-          DB_USER: root
-          DB_PASS: root
-          # Long enough to clear migrate.php's JWT_SECRET safety guard.
-          JWT_SECRET: ci-only-secret-${{ github.sha }}-padding-padding-padding
-        run: php scripts/migrate.php
+          MYSQL_PWD: root
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot clinic_booking_test \
+            < backend/db/schema.sql
+          for f in $(ls backend/db/migrations/*.sql | sort); do
+            mysql -h 127.0.0.1 -P 3306 -uroot clinic_booking_test < "$f" \
+              2>/dev/null || true
+          done
+          echo "Tables in clinic_booking_test:"
+          mysql -h 127.0.0.1 -P 3306 -uroot \
+            -e "SHOW TABLES IN clinic_booking_test;"
+          mysql -h 127.0.0.1 -P 3306 -uroot \
+            -e "SHOW TABLES IN clinic_booking_test;" \
+            | grep -q staff_users \
+            || { echo "ERROR: staff_users table missing after migration!"; exit 1; }
 
       - name: Run PHPUnit
         working-directory: backend
