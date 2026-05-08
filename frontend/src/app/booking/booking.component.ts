@@ -84,6 +84,15 @@ export class BookingComponent implements OnInit {
     this.fetchSlots();
   }
 
+  /** Returns true when a YYYY-MM-DD string lands on Saturday or Sunday.
+   *  Parsed as local date to avoid UTC-offset shifting the day of week. */
+  isWeekend(dateStr: string | null | undefined): boolean {
+    if (!dateStr) return false;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const day = new Date(y, m - 1, d).getDay(); // 0 = Sun, 6 = Sat
+    return day === 0 || day === 6;
+  }
+
   /** Step 1: provider. */
   readonly providerForm: FormGroup = this.fb.group({
     provider_id: ['', Validators.required],
@@ -170,7 +179,14 @@ export class BookingComponent implements OnInit {
       },
       error: (err: ApiError) => {
         this.slotsLoading.set(false);
-        this.slotsError.set(err.message);
+        // NO_SCHEDULE is a predictable user state (weekend, day off, schedule not
+        // configured yet) — show the friendly "not working that day" UI rather than
+        // a red error box. Any other error code is a real problem; surface it.
+        if (err.code === 'NO_SCHEDULE') {
+          this.slots.set([]);
+        } else {
+          this.slotsError.set(err.message);
+        }
       },
     });
   }

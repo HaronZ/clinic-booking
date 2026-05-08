@@ -44,6 +44,10 @@
       <input id="date" type="date" [min]="today" [max]="maxDate" formControlName="date" />
       <small class="hint">You can book up to 90 days in advance.</small>
 
+      @if (isWeekend(typeDateForm.value.date)) {
+        <p class="hint hint-warn">⚠️ Most clinics are closed on weekends. You can still continue — the next step will let you know if any slots are available.</p>
+      }
+
       <div class="actions">
         <button type="button" (click)="goBack()">Back</button>
         <button type="button" (click)="goNext()" [disabled]="typeDateForm.invalid">Next</button>
