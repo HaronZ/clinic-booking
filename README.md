@@ -261,17 +261,71 @@ Expected: **101 tests, 201+ assertions** — all green.
 
 ## Email configuration
 
-By default `MAIL_ENABLED=0` — emails are skipped. To enable:
+By default `MAIL_ENABLED=0` — emails are silently skipped (logged to PHP error log). No SMTP setup needed to run the app.
+
+### What emails are sent
+
+| Trigger | Recipient | What it says |
+|---|---|---|
+| Patient completes booking | Patient's email (if provided) | Appointment details, date/time, reference ID |
+| *(optional)* Daily digest | Staff member | List of today's appointments (call `sendDailySchedule()` from a cron job) |
+
+### Option A — Gmail (quickest for personal use)
+
+Gmail requires an **App Password** — your regular account password won't work here.
+
+1. Make sure [2-Step Verification](https://myaccount.google.com/security) is turned on for your Google account.
+2. Go to **[myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)**.
+3. Name it (e.g. "Clinic Booking") → click **Create**.
+4. Copy the 16-character password Google shows you.
+5. In `backend/.env`:
 
 ```ini
 MAIL_ENABLED=1
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USER=your-account@gmail.com
-MAIL_PASS=your-16-char-app-password
-MAIL_FROM=noreply@yourclinic.com
+MAIL_PASS=abcd efgh ijkl mnop        # paste the 16-char app password (spaces are fine)
+MAIL_FROM=your-account@gmail.com     # must match MAIL_USER for Gmail
 MAIL_FROM_NAME="Your Clinic"
 ```
+
+> ⚠️ `MAIL_FROM` must equal `MAIL_USER` when using Gmail. Setting a custom `noreply@yourclinic.com` from address requires a paid Google Workspace account or a transactional provider (see Option C).
+
+### Option B — Mailtrap (safe for development/testing)
+
+[Mailtrap](https://mailtrap.io) catches all outgoing emails in a test inbox — nothing reaches real patients. Free plan is sufficient.
+
+1. Sign up at mailtrap.io → go to **Email Testing → Inboxes → your inbox → SMTP Settings**.
+2. Select **PHP** from the "Integrations" dropdown and copy the credentials.
+3. In `backend/.env`:
+
+```ini
+MAIL_ENABLED=1
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=587
+MAIL_USER=<your mailtrap username>
+MAIL_PASS=<your mailtrap password>
+MAIL_FROM=noreply@yourclinic.com     # any address works in Mailtrap
+MAIL_FROM_NAME="Your Clinic"
+```
+
+### Option C — Transactional providers (recommended for production)
+
+For real clinics, services like [Mailgun](https://www.mailgun.com), [SendGrid](https://sendgrid.com), or [Brevo](https://www.brevo.com) give better deliverability and custom from-addresses. All offer a generous free tier.
+
+Use the SMTP credentials from their dashboard (same `.env` variables — only the host/port/user/pass change).
+
+### Customising the email template
+
+The HTML templates live in `backend/src/Service/EmailService.php`:
+
+- `bookingEmailHtml()` — the patient booking confirmation email
+- `scheduleEmailHtml()` — the staff daily digest email
+
+Both use inline CSS (required for email clients). Edit the HTML strings directly in those private methods.
+
+---
 
 ---
 
@@ -379,7 +433,7 @@ See `CLAUDE.md` for the complete rule set.
 - [ ] Restrict MySQL user: `GRANT SELECT, INSERT, UPDATE ON clinic_booking.* TO …`
 - [ ] Log in as admin, **change the default password**, then create real staff accounts
 - [ ] Set PHP `display_errors=Off`, `log_errors=On`
-- [ ] Add rate limiting on `/api/auth/login` (nginx `limit_req`)
+- [x] ~~Add rate limiting on `/api/auth/login`~~ — built-in: 10 attempts per IP per 15 min, MySQL-backed
 
 ---
 
