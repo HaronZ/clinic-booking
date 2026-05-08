@@ -1,6 +1,6 @@
 import {
-  ChangeDetectionStrategy, Component, OnInit,
-  inject, signal,
+  ChangeDetectionStrategy, Component, EventEmitter,
+  OnInit, Output, inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -9,6 +9,7 @@ import {
 } from '@angular/forms';
 
 import { AdminApiService, AdminProvider, ApiError } from '../../services/admin-api.service';
+import { ToastService } from '../../services/toast.service';
 
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -35,10 +36,12 @@ type DayRowGroup = FormGroup<DayRowControls>;
     th { background:#f9fafb; padding:.6rem .9rem; text-align:left; border-bottom:1px solid #e5e7eb; font-weight:600; }
     td { padding:.55rem .9rem; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
     tr:last-child td { border-bottom:none; }
-    .day-off { color:#9ca3af; }
+    .day-off { color:#9ca3af; background:#fafafa; }
+    .day-off td:first-child strong { color:#9ca3af; }
+    .off-badge { display:inline-block; margin-left:.5rem; font-size:.7rem; font-weight:600; padding:.1rem .4rem; background:#f3f4f6; color:#9ca3af; border-radius:3px; }
     input[type="time"] { padding:.38rem .5rem; border:1px solid #d1d5db; border-radius:4px; font:inherit; font-size:.88rem; }
     input[type="time"]:focus { outline:none; border-color:#2563eb; }
-    input[type="time"]:disabled { background:#f9fafb; color:#9ca3af; }
+    input[type="time"]:disabled { background:#f9fafb; color:#9ca3af; cursor:not-allowed; }
     .actions-row { padding:1rem 1.5rem; border-top:1px solid #f3f4f6; display:flex; gap:.75rem; align-items:center; }
     .btn { padding:.35rem .8rem; font:inherit; font-size:.88rem; border-radius:4px; cursor:pointer; border:1px solid transparent; font-weight:600; }
     .btn:disabled { opacity:.5; cursor:not-allowed; }
@@ -76,9 +79,12 @@ type DayRowGroup = FormGroup<DayRowControls>;
             <tbody formArrayName="days">
               @for (row of days.controls; track row; let i = $index) {
                 <tr [formGroupName]="i" [class.day-off]="!row.controls.working.value">
-                  <td><strong>{{ dayLabels[i] }}</strong></td>
+                  <td>
+                    <strong>{{ dayLabels[i] }}</strong>
+                    @if (!row.controls.working.value) { <span class="off-badge">OFF</span> }
+                  </td>
                   <td class="check-cell">
-                    <input type="checkbox" formControlName="working" />
+                    <input type="checkbox" formControlName="working" [attr.aria-label]="'Working on ' + dayLabels[i]" />
                   </td>
                   <td>
                     <input type="time" formControlName="start_time" [attr.disabled]="row.controls.working.value ? null : ''" />
@@ -109,8 +115,11 @@ type DayRowGroup = FormGroup<DayRowControls>;
   `,
 })
 export class SchedulesSectionComponent implements OnInit {
-  private readonly api = inject(AdminApiService);
-  private readonly fb  = inject(FormBuilder);
+  private readonly api   = inject(AdminApiService);
+  private readonly fb    = inject(FormBuilder);
+  private readonly toast = inject(ToastService);
+
+  @Output() unauthorized = new EventEmitter<void>();
 
   readonly providers        = signal<AdminProvider[]>([]);
   readonly providersLoading = signal(true);
@@ -137,7 +146,11 @@ export class SchedulesSectionComponent implements OnInit {
   ngOnInit(): void {
     this.api.getProviders(false).subscribe({
       next:  (list) => { this.providers.set(list); this.providersLoading.set(false); },
-      error: (e: ApiError) => { this.listErr.set(e.message); this.providersLoading.set(false); },
+      error: (e: ApiError) => {
+        this.providersLoading.set(false);
+        if (e.status === 401) { this.unauthorized.emit(); return; }
+        this.listErr.set(e.message);
+      },
     });
 
     this.providerCtrl.valueChanges.subscribe((id) => this.onProviderChange(id));
@@ -177,7 +190,11 @@ export class SchedulesSectionComponent implements OnInit {
         }
         this.scheduleLoading.set(false);
       },
-      error: (e: ApiError) => { this.listErr.set(e.message); this.scheduleLoading.set(false); },
+      error: (e: ApiError) => {
+        this.scheduleLoading.set(false);
+        if (e.status === 401) { this.unauthorized.emit(); return; }
+        this.listErr.set(e.message);
+      },
     });
   }
 
@@ -217,8 +234,13 @@ export class SchedulesSectionComponent implements OnInit {
         }
         this.saving.set(false);
         this.savedOk.set(true);
+        this.toast.success('Schedule saved.');
       },
-      error: (e: ApiError) => { this.saving.set(false); this.saveErr.set(e.message); },
+      error: (e: ApiError) => {
+        this.saving.set(false);
+        if (e.status === 401) { this.unauthorized.emit(); return; }
+        this.saveErr.set(e.message);
+      },
     });
   }
 }

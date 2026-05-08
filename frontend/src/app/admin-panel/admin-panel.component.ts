@@ -70,11 +70,13 @@ type Tab = 'providers' | 'types' | 'schedules' | 'staff';
       <button class="tab-btn" [class.active]="tab()==='staff'"      (click)="tab.set('staff')">Staff Accounts</button>
     </nav>
 
-    <!-- Active section -->
-    @if (tab() === 'providers')  { <app-providers-section  /> }
-    @if (tab() === 'types')      { <app-types-section      /> }
-    @if (tab() === 'schedules')  { <app-schedules-section  /> }
-    @if (tab() === 'staff')      { <app-staff-section      /> }
+    <!-- Active section. Each section emits (unauthorized) on a 401 so the
+         shell can log the user out cleanly instead of leaving them stuck on
+         a dead admin page. -->
+    @if (tab() === 'providers')  { <app-providers-section  (unauthorized)="onUnauthorized()" /> }
+    @if (tab() === 'types')      { <app-types-section      (unauthorized)="onUnauthorized()" /> }
+    @if (tab() === 'schedules')  { <app-schedules-section  (unauthorized)="onUnauthorized()" /> }
+    @if (tab() === 'staff')      { <app-staff-section      (unauthorized)="onUnauthorized()" /> }
   `,
 })
 export class AdminPanelComponent {
@@ -92,4 +94,7 @@ export class AdminPanelComponent {
     this.auth.logout();
     this.loggedOut.emit();
   }
+
+  /** Bubbled up from a section when the API returns 401 mid-action. */
+  onUnauthorized(): void { this.logout(); }
 }

@@ -1,16 +1,19 @@
 import {
-  ChangeDetectionStrategy, Component, OnInit,
-  inject, signal,
+  ChangeDetectionStrategy, Component, EventEmitter,
+  HostListener, OnInit, Output, inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AdminApiService, AdminProvider, ApiError } from '../../services/admin-api.service';
+import { AutofocusDirective } from '../../shared/autofocus.directive';
+import { ConfirmService } from '../../services/confirm.service';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-providers-section',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AutofocusDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display: block; padding: 1.5rem; }
@@ -63,7 +66,11 @@ import { AdminApiService, AdminProvider, ApiError } from '../../services/admin-a
     @if (listErr()) { <div class="alert-err">{{ listErr() }}</div> }
 
     @if (!loading() && providers().length === 0 && !listErr()) {
-      <div class="empty-msg">No providers yet. Add one to get started.</div>
+      @if (showInactive()) {
+        <div class="empty-msg">No providers in the system yet. Add one to get started.</div>
+      } @else {
+        <div class="empty-msg">No active providers. Toggle <strong>Show inactive</strong> to see soft-deleted ones.</div>
+      }
     }
 
     @if (!loading() && providers().length > 0) {
@@ -104,24 +111,26 @@ import { AdminApiService, AdminProvider, ApiError } from '../../services/admin-a
           <h3>{{ editing() ? 'Edit Provider' : 'Add Provider' }}</h3>
           @if (formErr()) { <div class="alert-err" role="alert">{{ formErr() }}</div> }
           <form [formGroup]="form" (ngSubmit)="save()">
-            <div class="field">
-              <label for="prov-name">Name *</label>
-              <input id="prov-name" formControlName="name" placeholder="Dr. Maria Santos" />
-            </div>
-            <div class="field">
-              <label for="prov-spec">Specialty *</label>
-              <input id="prov-spec" formControlName="specialty" placeholder="General Medicine" />
-            </div>
-            <div class="field">
-              <label for="prov-slug">Slug <small>(optional — auto-generated if blank)</small></label>
-              <input id="prov-slug" formControlName="slug" placeholder="dr-maria-santos" />
-            </div>
-            <div class="modal-actions">
-              <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
-              <button type="submit" class="btn btn-blue" [disabled]="saving() || form.invalid">
-                {{ saving() ? 'Saving…' : 'Save' }}
-              </button>
-            </div>
+            <fieldset [disabled]="saving()" style="border:none;padding:0;margin:0">
+              <div class="field">
+                <label for="prov-name">Name *</label>
+                <input id="prov-name" formControlName="name" placeholder="Dr. Maria Santos" appAutofocus />
+              </div>
+              <div class="field">
+                <label for="prov-spec">Specialty *</label>
+                <input id="prov-spec" formControlName="specialty" placeholder="General Medicine" />
+              </div>
+              <div class="field">
+                <label for="prov-slug">Slug <small>(optional — auto-generated if blank)</small></label>
+                <input id="prov-slug" formControlName="slug" placeholder="dr-maria-santos" />
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-blue" [disabled]="saving() || form.invalid">
+                  {{ saving() ? 'Saving…' : 'Save' }}
+                </button>
+              </div>
+            </fieldset>
           </form>
         </div>
       </div>
@@ -129,8 +138,13 @@ import { AdminApiService, AdminProvider, ApiError } from '../../services/admin-a
   `,
 })
 export class ProvidersSectionComponent implements OnInit {
-  private readonly api = inject(AdminApiService);
-  private readonly fb  = inject(FormBuilder);
+  private readonly api     = inject(AdminApiService);
+  private readonly fb      = inject(FormBuilder);
+  private readonly toast   = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
+
+  /** Bubbles a 401 up to the admin-panel shell so it can log the user out cleanly. */
+  @Output() unauthorized = new EventEmitter<void>();
 
   readonly providers    = signal<AdminProvider[]>([]);
   readonly loading      = signal(true);
@@ -147,6 +161,9 @@ export class ProvidersSectionComponent implements OnInit {
     slug:      [''],
   });
 
+  @HostListener('document:keydown.escape')
+  onEsc(): void { if (this.showModal() && !this.saving()) this.closeModal(); }
+
   ngOnInit(): void { this.load(); }
 
   load(): void {
@@ -154,7 +171,7 @@ export class ProvidersSectionComponent implements OnInit {
     this.listErr.set(null);
     this.api.getProviders(this.showInactive()).subscribe({
       next:  (list) => { this.providers.set(list); this.loading.set(false); },
-      error: (e: ApiError) => { this.listErr.set(e.message); this.loading.set(false); },
+      error: (e: ApiError) => { this.handleErr(e, /*toListErr*/ true); this.loading.set(false); },
     });
   }
 
@@ -165,8 +182,7 @@ export class ProvidersSectionComponent implements OnInit {
 
   openCreate(): void {
     this.editing.set(null);
-    this.form.reset({ name: '', specialty: '', slug: '' });
-    this.formErr.set(null);
+    this.resetForm();
     this.showModal.set(true);
   }
 
@@ -177,7 +193,13 @@ export class ProvidersSectionComponent implements OnInit {
     this.showModal.set(true);
   }
 
-  closeModal(): void { this.showModal.set(false); }
+  closeModal(): void {
+    this.showModal.set(false);
+    // Reset so the next openCreate / openEdit starts from a clean slate even
+    // if the user dismissed the previous attempt mid-edit.
+    this.resetForm();
+    this.editing.set(null);
+  }
 
   save(): void {
     if (this.saving()) return;
@@ -196,21 +218,57 @@ export class ProvidersSectionComponent implements OnInit {
       specialty: specialty.trim(),
       ...(slug.trim() ? { slug: slug.trim() } : {}),
     };
-    const p   = this.editing();
-    const req = p ? this.api.updateProvider(p.id, body) : this.api.createProvider(body);
+    const p     = this.editing();
+    const isNew = !p;
+    const req   = p ? this.api.updateProvider(p.id, body) : this.api.createProvider(body);
 
     req.subscribe({
-      next: () => { this.saving.set(false); this.closeModal(); this.load(); },
-      error: (e: ApiError) => { this.saving.set(false); this.formErr.set(e.message); },
+      next: () => {
+        this.saving.set(false);
+        this.closeModal();
+        this.toast.success(isNew ? 'Provider created.' : 'Provider updated.');
+        this.load();
+      },
+      error: (e: ApiError) => {
+        this.saving.set(false);
+        this.handleErr(e, /*toListErr*/ false);
+      },
     });
   }
 
-  deactivate(p: AdminProvider): void {
-    if (!confirm(`Deactivate "${p.name}"? Existing appointments are preserved.`)) return;
-    this.api.deleteProvider(p.id).subscribe({ next: () => this.load(), error: (e: ApiError) => alert(e.message) });
+  async deactivate(p: AdminProvider): Promise<void> {
+    const ok = await this.confirm.ask(
+      `Deactivate "${p.name}"? Existing appointments are preserved; the provider just won't appear on the booking page.`,
+      { title: 'Deactivate provider?', confirmLabel: 'Deactivate', danger: true },
+    );
+    if (!ok) return;
+    this.api.deleteProvider(p.id).subscribe({
+      next:  () => { this.toast.success(`${p.name} deactivated.`); this.load(); },
+      error: (e: ApiError) => this.handleErr(e, false),
+    });
   }
 
   restore(p: AdminProvider): void {
-    this.api.restoreProvider(p.id).subscribe({ next: () => this.load(), error: (e: ApiError) => alert(e.message) });
+    this.api.restoreProvider(p.id).subscribe({
+      next:  () => { this.toast.success(`${p.name} reactivated.`); this.load(); },
+      error: (e: ApiError) => this.handleErr(e, false),
+    });
+  }
+
+  private resetForm(): void {
+    this.form.reset({ name: '', specialty: '', slug: '' });
+    this.formErr.set(null);
+  }
+
+  /** Centralised error handling: 401 logs out, others toast or surface in form. */
+  private handleErr(e: ApiError, toListErr: boolean): void {
+    if (e.status === 401) { this.unauthorized.emit(); return; }
+    if (toListErr) {
+      this.listErr.set(e.message);
+    } else if (this.showModal()) {
+      this.formErr.set(e.message);
+    } else {
+      this.toast.error(e.message);
+    }
   }
 }

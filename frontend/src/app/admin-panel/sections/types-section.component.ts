@@ -1,16 +1,19 @@
 import {
-  ChangeDetectionStrategy, Component, OnInit,
-  inject, signal,
+  ChangeDetectionStrategy, Component, EventEmitter,
+  HostListener, OnInit, Output, inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AdminApiService, AdminAppointmentType, ApiError } from '../../services/admin-api.service';
+import { AutofocusDirective } from '../../shared/autofocus.directive';
+import { ConfirmService } from '../../services/confirm.service';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-types-section',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AutofocusDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display:block; padding:1.5rem; }
@@ -61,7 +64,11 @@ import { AdminApiService, AdminAppointmentType, ApiError } from '../../services/
     @if (listErr()) { <div class="alert-err">{{ listErr() }}</div> }
 
     @if (!loading() && types().length === 0 && !listErr()) {
-      <div class="empty-msg">No appointment types yet.</div>
+      @if (showInactive()) {
+        <div class="empty-msg">No appointment types defined yet. Add one to make it bookable.</div>
+      } @else {
+        <div class="empty-msg">No active appointment types. Toggle <strong>Show inactive</strong> to see soft-deleted ones.</div>
+      }
     }
 
     @if (!loading() && types().length > 0) {
@@ -99,24 +106,26 @@ import { AdminApiService, AdminAppointmentType, ApiError } from '../../services/
           <h3>{{ editing() ? 'Edit Appointment Type' : 'Add Appointment Type' }}</h3>
           @if (formErr()) { <div class="alert-err" role="alert">{{ formErr() }}</div> }
           <form [formGroup]="form" (ngSubmit)="save()">
-            <div class="field">
-              <label for="type-name">Name *</label>
-              <input id="type-name" formControlName="name" placeholder="General Consultation" />
-            </div>
-            <div class="field">
-              <label for="type-dur">Duration (minutes) * <small>1–480</small></label>
-              <input id="type-dur" type="number" formControlName="duration_minutes" min="1" max="480" placeholder="30" />
-            </div>
-            <div class="field">
-              <label for="type-slug">Slug <small>(optional)</small></label>
-              <input id="type-slug" formControlName="slug" placeholder="general-consultation" />
-            </div>
-            <div class="modal-actions">
-              <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
-              <button type="submit" class="btn btn-blue" [disabled]="saving() || form.invalid">
-                {{ saving() ? 'Saving…' : 'Save' }}
-              </button>
-            </div>
+            <fieldset [disabled]="saving()" style="border:none;padding:0;margin:0">
+              <div class="field">
+                <label for="type-name">Name *</label>
+                <input id="type-name" formControlName="name" placeholder="General Consultation" appAutofocus />
+              </div>
+              <div class="field">
+                <label for="type-dur">Duration (minutes) * <small>1–480</small></label>
+                <input id="type-dur" type="number" formControlName="duration_minutes" min="1" max="480" placeholder="30" />
+              </div>
+              <div class="field">
+                <label for="type-slug">Slug <small>(optional)</small></label>
+                <input id="type-slug" formControlName="slug" placeholder="general-consultation" />
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-blue" [disabled]="saving() || form.invalid">
+                  {{ saving() ? 'Saving…' : 'Save' }}
+                </button>
+              </div>
+            </fieldset>
           </form>
         </div>
       </div>
@@ -124,8 +133,12 @@ import { AdminApiService, AdminAppointmentType, ApiError } from '../../services/
   `,
 })
 export class TypesSectionComponent implements OnInit {
-  private readonly api = inject(AdminApiService);
-  private readonly fb  = inject(FormBuilder);
+  private readonly api     = inject(AdminApiService);
+  private readonly fb      = inject(FormBuilder);
+  private readonly toast   = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
+
+  @Output() unauthorized = new EventEmitter<void>();
 
   readonly types        = signal<AdminAppointmentType[]>([]);
   readonly loading      = signal(true);
@@ -144,6 +157,9 @@ export class TypesSectionComponent implements OnInit {
     slug:             [''],
   });
 
+  @HostListener('document:keydown.escape')
+  onEsc(): void { if (this.showModal() && !this.saving()) this.closeModal(); }
+
   ngOnInit(): void { this.load(); }
 
   load(): void {
@@ -151,7 +167,7 @@ export class TypesSectionComponent implements OnInit {
     this.listErr.set(null);
     this.api.getTypes(this.showInactive()).subscribe({
       next:  (list) => { this.types.set(list); this.loading.set(false); },
-      error: (e: ApiError) => { this.listErr.set(e.message); this.loading.set(false); },
+      error: (e: ApiError) => { this.handleErr(e, true); this.loading.set(false); },
     });
   }
 
@@ -159,8 +175,7 @@ export class TypesSectionComponent implements OnInit {
 
   openCreate(): void {
     this.editing.set(null);
-    this.form.reset({ name: '', duration_minutes: null, slug: '' });
-    this.formErr.set(null);
+    this.resetForm();
     this.showModal.set(true);
   }
 
@@ -171,7 +186,11 @@ export class TypesSectionComponent implements OnInit {
     this.showModal.set(true);
   }
 
-  closeModal(): void { this.showModal.set(false); }
+  closeModal(): void {
+    this.showModal.set(false);
+    this.resetForm();
+    this.editing.set(null);
+  }
 
   save(): void {
     if (this.saving()) return;
@@ -195,17 +214,42 @@ export class TypesSectionComponent implements OnInit {
       duration_minutes: Number(duration_minutes),
       ...(slug.trim() ? { slug: slug.trim() } : {}),
     };
-    const t   = this.editing();
-    const req = t ? this.api.updateType(t.id, body) : this.api.createType(body);
+    const t     = this.editing();
+    const isNew = !t;
+    const req   = t ? this.api.updateType(t.id, body) : this.api.createType(body);
 
     req.subscribe({
-      next:  () => { this.saving.set(false); this.closeModal(); this.load(); },
-      error: (e: ApiError) => { this.saving.set(false); this.formErr.set(e.message); },
+      next:  () => {
+        this.saving.set(false);
+        this.closeModal();
+        this.toast.success(isNew ? 'Appointment type created.' : 'Appointment type updated.');
+        this.load();
+      },
+      error: (e: ApiError) => { this.saving.set(false); this.handleErr(e, false); },
     });
   }
 
-  deactivate(t: AdminAppointmentType): void {
-    if (!confirm(`Deactivate "${t.name}"?`)) return;
-    this.api.deleteType(t.id).subscribe({ next: () => this.load(), error: (e: ApiError) => alert(e.message) });
+  async deactivate(t: AdminAppointmentType): Promise<void> {
+    const ok = await this.confirm.ask(
+      `Deactivate "${t.name}"? Existing appointments keep using it; new bookings won't see it.`,
+      { title: 'Deactivate appointment type?', confirmLabel: 'Deactivate', danger: true },
+    );
+    if (!ok) return;
+    this.api.deleteType(t.id).subscribe({
+      next:  () => { this.toast.success(`${t.name} deactivated.`); this.load(); },
+      error: (e: ApiError) => this.handleErr(e, false),
+    });
+  }
+
+  private resetForm(): void {
+    this.form.reset({ name: '', duration_minutes: null, slug: '' });
+    this.formErr.set(null);
+  }
+
+  private handleErr(e: ApiError, toListErr: boolean): void {
+    if (e.status === 401) { this.unauthorized.emit(); return; }
+    if (toListErr) { this.listErr.set(e.message); return; }
+    if (this.showModal()) { this.formErr.set(e.message); return; }
+    this.toast.error(e.message);
   }
 }

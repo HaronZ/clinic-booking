@@ -11,6 +11,7 @@ import { CommonModule } from '@angular/common';
 
 import { ApiService, ApiError } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
+import { ToastService } from '../services/toast.service';
 import { ScheduleAppointment, ScheduleResponse } from '../models/staff.model';
 
 @Component({
@@ -22,8 +23,9 @@ import { ScheduleAppointment, ScheduleResponse } from '../models/staff.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class StaffDashboardComponent implements OnInit {
-  private readonly api  = inject(ApiService);
-  private readonly auth = inject(AuthService);
+  private readonly api   = inject(ApiService);
+  private readonly auth  = inject(AuthService);
+  private readonly toast = inject(ToastService);
 
   @Output() loggedOut  = new EventEmitter<void>();
   @Output() goAdmin    = new EventEmitter<void>();
@@ -84,10 +86,16 @@ export class StaffDashboardComponent implements OnInit {
             ),
           });
         }
+        this.toast.success(`Marked as ${res.status}.`);
       },
       error: (err: ApiError) => {
         this.actioning.set(null);
-        alert(`Could not update status: ${err.message}`);
+        if (err.status === 401) {
+          this.auth.logout();
+          this.loggedOut.emit();
+          return;
+        }
+        this.toast.error(`Could not update status: ${err.message}`);
       },
     });
   }

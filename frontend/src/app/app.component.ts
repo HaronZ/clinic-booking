@@ -12,6 +12,8 @@ import { StaffLoginComponent }       from './staff-login/staff-login.component';
 import { StaffDashboardComponent }   from './staff-dashboard/staff-dashboard.component';
 import { AdminPanelComponent }       from './admin-panel/admin-panel.component';
 import { ChangePasswordComponent }   from './change-password/change-password.component';
+import { ToastComponent }            from './shared/toast.component';
+import { ConfirmDialogComponent }    from './shared/confirm-dialog.component';
 import { AuthService }               from './services/auth.service';
 
 type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard' | 'admin-panel' | 'change-password';
@@ -27,6 +29,8 @@ type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard' | 'ad
     StaffDashboardComponent,
     AdminPanelComponent,
     ChangePasswordComponent,
+    ToastComponent,
+    ConfirmDialogComponent,
   ],
   template: `
     <!-- Patient-facing views -->
@@ -53,6 +57,10 @@ type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard' | 'ad
         <a href="#" (click)="goToStaff($event)">Staff login</a>
       </nav>
     }
+
+    <!-- Global UX hosts: mounted once, used by every screen via DI -->
+    <app-toast />
+    <app-confirm-dialog />
   `,
   styles: [`
     .staff-nav {

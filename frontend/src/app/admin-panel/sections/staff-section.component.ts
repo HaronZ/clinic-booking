@@ -1,11 +1,14 @@
 import {
-  ChangeDetectionStrategy, Component, OnInit,
-  inject, signal,
+  ChangeDetectionStrategy, Component, EventEmitter,
+  HostListener, OnInit, Output, inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AdminApiService, AdminProvider, AdminStaff, ApiError } from '../../services/admin-api.service';
+import { AutofocusDirective } from '../../shared/autofocus.directive';
+import { ConfirmService } from '../../services/confirm.service';
+import { ToastService } from '../../services/toast.service';
 
 const ROLES = ['admin', 'receptionist', 'doctor'] as const;
 type Role = typeof ROLES[number];
@@ -13,7 +16,7 @@ type Role = typeof ROLES[number];
 @Component({
   selector: 'app-staff-section',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AutofocusDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display:block; padding:1.5rem; }
@@ -66,7 +69,11 @@ type Role = typeof ROLES[number];
     @if (listErr()) { <div class="alert-err">{{ listErr() }}</div> }
 
     @if (!loading() && staff().length === 0 && !listErr()) {
-      <div class="empty-msg">No staff accounts found.</div>
+      @if (showInactive()) {
+        <div class="empty-msg">No staff accounts yet. Add one to get started.</div>
+      } @else {
+        <div class="empty-msg">No active staff accounts. Toggle <strong>Show inactive</strong> to see soft-deleted ones.</div>
+      }
     }
 
     @if (!loading() && staff().length > 0) {
@@ -109,46 +116,48 @@ type Role = typeof ROLES[number];
           <h3>{{ editing() ? 'Edit Staff Account' : 'Add Staff Account' }}</h3>
           @if (formErr()) { <div class="alert-err" role="alert">{{ formErr() }}</div> }
           <form [formGroup]="form" (ngSubmit)="save()">
-            <div class="field">
-              <label for="staff-user">Username *</label>
-              <input id="staff-user" formControlName="username" placeholder="ana.reyes" autocomplete="off" />
-            </div>
-            <div class="field">
-              <label for="staff-name">Full Name *</label>
-              <input id="staff-name" formControlName="name" placeholder="Dr. Ana Reyes" />
-            </div>
-            <div class="field">
-              <label for="staff-pw">
-                {{ editing() ? 'New Password' : 'Password *' }}
-                @if (editing()) { <small>(leave blank to keep current)</small> }
-              </label>
-              <input id="staff-pw" type="password" formControlName="password"
-                     [placeholder]="editing() ? '(unchanged)' : 'min. 8 characters'"
-                     autocomplete="new-password" />
-            </div>
-            <div class="field">
-              <label for="staff-role">Role *</label>
-              <select id="staff-role" formControlName="role">
-                @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
-              </select>
-            </div>
-            @if (form.controls.role.value === 'doctor') {
+            <fieldset [disabled]="saving()" style="border:none;padding:0;margin:0">
               <div class="field">
-                <label for="staff-provider">Linked Provider *</label>
-                <select id="staff-provider" formControlName="provider_id">
-                  <option value="">— Select provider —</option>
-                  @for (p of providers(); track p.id) {
-                    <option [value]="p.id">{{ p.name }}</option>
-                  }
+                <label for="staff-user">Username *</label>
+                <input id="staff-user" formControlName="username" placeholder="ana.reyes" autocomplete="off" appAutofocus />
+              </div>
+              <div class="field">
+                <label for="staff-name">Full Name *</label>
+                <input id="staff-name" formControlName="name" placeholder="Dr. Ana Reyes" />
+              </div>
+              <div class="field">
+                <label for="staff-pw">
+                  {{ editing() ? 'New Password' : 'Password *' }}
+                  @if (editing()) { <small>(leave blank to keep current)</small> }
+                </label>
+                <input id="staff-pw" type="password" formControlName="password"
+                       [placeholder]="editing() ? '(unchanged)' : 'min. 8 characters'"
+                       autocomplete="new-password" />
+              </div>
+              <div class="field">
+                <label for="staff-role">Role *</label>
+                <select id="staff-role" formControlName="role">
+                  @for (r of roles; track r) { <option [value]="r">{{ r }}</option> }
                 </select>
               </div>
-            }
-            <div class="modal-actions">
-              <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
-              <button type="submit" class="btn btn-blue" [disabled]="saving()">
-                {{ saving() ? 'Saving…' : 'Save' }}
-              </button>
-            </div>
+              @if (form.controls.role.value === 'doctor') {
+                <div class="field">
+                  <label for="staff-provider">Linked Provider *</label>
+                  <select id="staff-provider" formControlName="provider_id">
+                    <option value="">— Select provider —</option>
+                    @for (p of providers(); track p.id) {
+                      <option [value]="p.id">{{ p.name }}</option>
+                    }
+                  </select>
+                </div>
+              }
+              <div class="modal-actions">
+                <button type="button" class="btn btn-gray" (click)="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-blue" [disabled]="saving()">
+                  {{ saving() ? 'Saving…' : 'Save' }}
+                </button>
+              </div>
+            </fieldset>
           </form>
         </div>
       </div>
@@ -156,8 +165,15 @@ type Role = typeof ROLES[number];
   `,
 })
 export class StaffSectionComponent implements OnInit {
-  private readonly api = inject(AdminApiService);
-  private readonly fb  = inject(FormBuilder);
+  private readonly api     = inject(AdminApiService);
+  private readonly fb      = inject(FormBuilder);
+  private readonly toast   = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
+
+  @Output() unauthorized = new EventEmitter<void>();
+
+  @HostListener('document:keydown.escape')
+  onEsc(): void { if (this.showModal() && !this.saving()) this.closeModal(); }
 
   readonly staff        = signal<AdminStaff[]>([]);
   readonly providers    = signal<AdminProvider[]>([]);
@@ -205,7 +221,7 @@ export class StaffSectionComponent implements OnInit {
     this.listErr.set(null);
     this.api.getStaff(this.showInactive()).subscribe({
       next:  (list) => { this.staff.set(list); this.loading.set(false); },
-      error: (e: ApiError) => { this.listErr.set(e.message); this.loading.set(false); },
+      error: (e: ApiError) => { this.handleErr(e, true); this.loading.set(false); },
     });
   }
 
@@ -241,7 +257,12 @@ export class StaffSectionComponent implements OnInit {
     this.showModal.set(true);
   }
 
-  closeModal(): void { this.showModal.set(false); }
+  closeModal(): void {
+    this.showModal.set(false);
+    this.editing.set(null);
+    this.form.reset({ username: '', name: '', password: '', role: 'receptionist', provider_id: '' });
+    this.formErr.set(null);
+  }
 
   save(): void {
     if (this.saving()) return;
@@ -266,8 +287,12 @@ export class StaffSectionComponent implements OnInit {
       if (password)          patch['password']    = password;
 
       this.api.updateStaff(s.id, patch).subscribe({
-        next:  () => { this.saving.set(false); this.closeModal(); this.load(); },
-        error: (e: ApiError) => { this.saving.set(false); this.formErr.set(e.message); },
+        next:  () => {
+          this.saving.set(false); this.closeModal();
+          this.toast.success(`${name.trim()} updated.`);
+          this.load();
+        },
+        error: (e: ApiError) => { this.saving.set(false); this.handleErr(e, false); },
       });
     } else {
       const body: Record<string, unknown> = {
@@ -276,14 +301,32 @@ export class StaffSectionComponent implements OnInit {
       if (role === 'doctor') body['provider_id'] = provider_id;
 
       this.api.createStaff(body as Parameters<typeof this.api.createStaff>[0]).subscribe({
-        next:  () => { this.saving.set(false); this.closeModal(); this.load(); },
-        error: (e: ApiError) => { this.saving.set(false); this.formErr.set(e.message); },
+        next:  () => {
+          this.saving.set(false); this.closeModal();
+          this.toast.success(`Staff "${username.trim()}" created.`);
+          this.load();
+        },
+        error: (e: ApiError) => { this.saving.set(false); this.handleErr(e, false); },
       });
     }
   }
 
-  deactivate(s: AdminStaff): void {
-    if (!confirm(`Deactivate "${s.username}"?`)) return;
-    this.api.deleteStaff(s.id).subscribe({ next: () => this.load(), error: (e: ApiError) => alert(e.message) });
+  async deactivate(s: AdminStaff): Promise<void> {
+    const ok = await this.confirm.ask(
+      `Deactivate "${s.username}"? They won't be able to log in until reactivated.`,
+      { title: 'Deactivate staff account?', confirmLabel: 'Deactivate', danger: true },
+    );
+    if (!ok) return;
+    this.api.deleteStaff(s.id).subscribe({
+      next:  () => { this.toast.success(`${s.username} deactivated.`); this.load(); },
+      error: (e: ApiError) => this.handleErr(e, false),
+    });
+  }
+
+  private handleErr(e: ApiError, toListErr: boolean): void {
+    if (e.status === 401) { this.unauthorized.emit(); return; }
+    if (toListErr) { this.listErr.set(e.message); return; }
+    if (this.showModal()) { this.formErr.set(e.message); return; }
+    this.toast.error(e.message);
   }
 }
