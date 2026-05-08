@@ -51,10 +51,11 @@ type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard' | 'ad
       <app-change-password (changed)="onPasswordChanged()" />
     }
 
-    <!-- Tiny nav link for staff -->
+    <!-- Staff login — fixed top-right so staff can always find it without
+         it getting in the way of patients reading the booking form -->
     @if (view() === 'booking' || view() === 'confirmation') {
-      <nav class="staff-nav no-print">
-        <a href="#" (click)="goToStaff($event)">Staff login</a>
+      <nav class="staff-nav no-print" aria-label="Staff portal">
+        <a href="#" (click)="goToStaff($event)">Staff login →</a>
       </nav>
     }
 
@@ -64,16 +65,30 @@ type View = 'booking' | 'confirmation' | 'staff-login' | 'staff-dashboard' | 'ad
   `,
   styles: [`
     .staff-nav {
-      text-align: center;
-      padding: 1.5rem;
+      position: fixed;
+      top: 0.75rem;
+      right: 1rem;
+      z-index: 50;
       font-family: system-ui, sans-serif;
     }
     .staff-nav a {
-      color: #9ca3af;
-      font-size: 0.8rem;
+      display: inline-block;
+      color: #6b7280;
+      font-size: 0.78rem;
+      font-weight: 500;
       text-decoration: none;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.06);
+      transition: background .12s, color .12s;
     }
-    .staff-nav a:hover { color: #4b5563; }
+    .staff-nav a:hover {
+      background: #f3f4f6;
+      color: #374151;
+      border-color: #d1d5db;
+    }
   `],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
