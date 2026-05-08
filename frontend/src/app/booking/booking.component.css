@@ -127,7 +127,7 @@ button {
   font: inherit;
 }
 
-button:hover:not(:disabled) {
+button:not(.link-btn):hover:not(:disabled) {
   background: #f9fafb;
 }
 
