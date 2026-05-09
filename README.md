@@ -24,7 +24,7 @@ A production-ready clinic appointment booking system. Patients book appointments
 | Doctor | `ana.reyes` | `doctor123` | Doctor view (own schedule only) |
 | Doctor | `luis.mendoza` | `doctor123` | Doctor view |
 
-> Staff login is at the bottom of the booking page.
+> Staff login is the small **"Staff login →"** button pinned to the top-right corner of the booking page.
 
 ---
 
@@ -224,7 +224,7 @@ Open **http://localhost:4200**
 
 If you ran `migrate.php` without `--demo`, log in as the initial admin to configure everything via the UI — no SQL editing required:
 
-1. Click **"Staff login"** at the bottom of the booking page.
+1. Click the **"Staff login →"** button in the top-right corner of the booking page.
 2. Log in as `admin` / `admin123`.
 3. You'll be redirected to **Set Your Password** (forced first-login change).
 4. After setting your password, you land on the **Admin Panel**.
